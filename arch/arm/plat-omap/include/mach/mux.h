@@ -819,6 +819,11 @@ enum omap34xx_index {
 	AH23_34XX_DSI_DY1,
 	AG24_34XX_DSI_DX2,
 	AH24_34XX_DSI_DY2,
+
+        /* WLAN IRQ */
+        B24_3430_GPIO101,
+        W21_3430_GPIO162,
+
 };
 
 struct omap_mux_cfg {
