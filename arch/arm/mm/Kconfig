@@ -644,6 +644,12 @@ config CPU_DCACHE_WRITETHROUGH
 	  Say Y here to use the data cache in writethrough mode. Unless you
 	  specifically require this or are unsure, say N.
 
+config CPU_L2CACHE_DISABLE
+	bool "Disable level 2 cache"
+	depends on CPU_V7
+	help
+	 Say Y here to disable the level 2 cache.  If unsure, say N.
+
 config CPU_CACHE_ROUND_ROBIN
 	bool "Round robin I and D cache replacement algorithm"
 	depends on (CPU_ARM926T || CPU_ARM946E || CPU_ARM1020) && (!CPU_ICACHE_DISABLE || !CPU_DCACHE_DISABLE)

@@ -193,6 +193,19 @@ __v7_setup:
 	mov	r10, #0x1f			@ domains 0, 1 = manager
 	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
 #endif
+
+#if defined(CONFIG_ARCH_OMAP3)
+	@ OMAP3: L2EN bit accessed in nonsecure mode
+	@ L2 cache is enabled in the aux control register
+	 mrc     p15, 0, r0, c1, c0, 1
+#ifdef CONFIG_CPU_L2CACHE_DISABLE
+	bic     r0, r0, #0x2            @ disable L2 Cache
+#else
+	orr     r0, r0, #0x2            @ enable L2 Cache
+#endif
+	mcr     p15, 0, r0, c1, c0, 1   @ Enable the L2EN banked bit as well
+#endif
+
 	ldr	r5, =0xff0aa1a8
 	ldr	r6, =0x40e040e0
 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
