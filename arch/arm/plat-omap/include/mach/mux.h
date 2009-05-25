@@ -831,6 +831,7 @@ enum omap34xx_index {
 	D19_3430_GPIO96,
         B24_3430_GPIO101,
         W21_3430_GPIO162,
+	R21_3430_GPIO180,
 
 	/* McSPI */
 	AB1_3430_McSPI1_CS2,
