@@ -378,6 +378,8 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
 	struct input_dev *input_dev;
 	struct omap_kp_platform_data *pdata =  pdev->dev.platform_data;
 	int i, col_idx = 0, row_idx = 0, irq_idx, ret;
+	char phys_path[100];
+	char *input_name;
 
 	if (!pdata->rows || !pdata->cols || !pdata->keymap) {
 		printk(KERN_ERR "No rows, cols or keymap from pdata\n");
@@ -482,8 +484,14 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
 		__set_bit(EV_SW, input_dev->evbit);
 	for (i = 0; keymap[i] != 0; i++)
 		__set_bit(keymap[i] & KEY_MAX, input_dev->keybit);
-	input_dev->name = "omap-keypad";
-	input_dev->phys = "omap-keypad/input0";
+
+	if (pdata->input_name)
+		input_name = pdata->input_name;
+	else
+		input_name = "omap-keypad";
+	snprintf(phys_path, 100, "%s/input0", input_name);
+	input_dev->name = input_name;
+	input_dev->phys = phys_path;
 	input_dev->dev.parent = &pdev->dev;
 
 	input_dev->id.bustype = BUS_HOST;

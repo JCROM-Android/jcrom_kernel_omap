@@ -26,6 +26,7 @@ struct omap_kp_platform_data {
 	unsigned int rep:1;
 	unsigned long delay;
 	unsigned int dbounce:1;
+	char *input_name;
 	/* specific to OMAP242x*/
 	unsigned int *row_gpios;
 	unsigned int *col_gpios;
