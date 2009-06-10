@@ -888,6 +888,8 @@ enum omap34xx_index {
 	AG24_34XX_DSI_DX2,
 	AH24_34XX_DSI_DY2,
 
+	/* HDQ */
+	J25_34XX_HDQ_SIO,
 };
 
 struct omap_mux_cfg {
