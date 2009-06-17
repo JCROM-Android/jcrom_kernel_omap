@@ -95,7 +95,7 @@ static struct platform_device zoom2_smc911x_device = {
 	.resource	= zoom2_smc911x_resources,
 };
 
-#ifdef CONFIG_WL127X_POWER
+#ifdef CONFIG_WL127X_RFKILL
 static int wl127x_gpios[] = {
 	109,    /* Bluetooth Enable GPIO */
 	161,    /* FM Enable GPIO */
@@ -103,7 +103,7 @@ static int wl127x_gpios[] = {
 };
 
 static struct platform_device zoom2_wl127x_device = {
-	.name           = "wl127x",
+	.name           = "wl127x-rfkill",
 	.id             = -1,
 	.dev.platform_data = &wl127x_gpios,
 };
@@ -282,7 +282,7 @@ static struct platform_device zoom2_dss_device = {
 static struct platform_device *zoom2_devices[] __initdata = {
 	&zoom2_dss_device,
 	&zoom2_smc911x_device,
-#ifdef CONFIG_WL127X_POWER
+#ifdef CONFIG_WL127X_RFKILL
 	&zoom2_wl127x_device,
 #endif
 	&omap_hdq_device,
