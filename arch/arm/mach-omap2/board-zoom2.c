@@ -245,14 +245,71 @@ static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 
 #define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
 
+static void zoom2_lcd_panel_init(void)
+{
+	unsigned char lcd_panel_reset_gpio;
 
+	omap_cfg_reg(AF21_34XX_GPIO8);
+	omap_cfg_reg(B23_34XX_GPIO167);
+	omap_cfg_reg(AB1_34XX_McSPI1_CS2);
+	omap_cfg_reg(A24_34XX_GPIO94);
+
+	if (omap_rev() > OMAP3430_REV_ES3_0) {
+		/* Production Zoom2 Board:
+		 * GPIO-96 is the LCD_RESET_GPIO
+		 */
+		omap_cfg_reg(C25_34XX_GPIO96);
+		lcd_panel_reset_gpio = 96;
+	} else {
+		/* Pilot Zoom2 board
+		 * GPIO-55 is the LCD_RESET_GPIO
+		 */
+		omap_cfg_reg(T8_34XX_GPIO55);
+		lcd_panel_reset_gpio = 55;
+	}
+
+	gpio_request(lcd_panel_reset_gpio, "lcd reset");
+	gpio_request(LCD_PANEL_QVGA_GPIO, "lcd qvga");
+	gpio_request(LCD_PANEL_ENABLE_GPIO, "lcd panel");
+	gpio_request(LCD_PANEL_BACKLIGHT_GPIO, "lcd backlight");
+
+	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 0);
+	gpio_direction_output(lcd_panel_reset_gpio, 0);
+	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
+	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
+
+	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 1);
+	gpio_direction_output(lcd_panel_reset_gpio, 1);
+}
 static int zoom2_panel_enable_lcd(struct omap_display *display)
 {
+	if (omap_rev() > OMAP3430_REV_ES1_0) {
+		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+					ENABLE_VPLL2_DEDICATED,
+					TWL4030_VPLL2_DEDICATED);
+		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+					ENABLE_VPLL2_DEV_GRP,
+					TWL4030_VPLL2_DEV_GRP);
+		}
+
+	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 1);
+	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 1);
+
 	return 0;
 }
 
 static void zoom2_panel_disable_lcd(struct omap_display *display)
 {
+	if (omap_rev() > OMAP3430_REV_ES1_0) {
+		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
+					TWL4030_VPLL2_DEDICATED);
+		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
+					TWL4030_VPLL2_DEV_GRP);
+	}
+
+	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
+	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
+
 }
 
 static struct omap_dss_display_config zoom2_display_data_lcd = {
@@ -577,6 +634,7 @@ static void __init omap_zoom2_init(void)
 	omap_serial_init();
 	usb_musb_init();
 	config_wlan_gpio();
+	zoom2_lcd_panel_init();
 }
 
 static struct map_desc zoom2_io_desc[] __initdata = {
