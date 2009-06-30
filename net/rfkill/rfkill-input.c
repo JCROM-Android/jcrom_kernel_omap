@@ -324,6 +324,9 @@ static void rfkill_event(struct input_handle *handle, unsigned int type,
 		case KEY_WIMAX:
 			t = RFKILL_TYPE_WIMAX;
 			break;
+		case KEY_FM:
+			t = RFKILL_TYPE_FM;
+			break;
 		default:
 			return;
 		}
