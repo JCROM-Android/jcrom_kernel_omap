@@ -26,10 +26,16 @@
 
 #include <linux/rfkill.h>
 
-struct wl127x_rfkill_platform_data {
-	int nshutdown_gpio;
+enum wl127x_devices {
+	WL127X_BLUETOOTH = 0,
+	WL127X_FM,
+	WL127X_MAX_DEV,
+};
 
-	struct rfkill *rfkill;  /* for driver only */
+struct wl127x_rfkill_platform_data {
+	int bt_nshutdown_gpio;
+	int fm_enable_gpio;
+	struct rfkill *rfkill[WL127X_MAX_DEV];  /* for driver only */
 };
 
 #endif
