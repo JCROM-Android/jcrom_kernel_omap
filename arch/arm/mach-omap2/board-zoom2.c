@@ -123,6 +123,13 @@ static struct platform_device zoom2_wl127x_device = {
 	.id             = -1,
 	.dev.platform_data = &wl127x_plat_data,
 };
+
+static void config_btfm_gpios(void)
+{
+	omap_cfg_reg(BT_3430_GPIO161);
+	omap_cfg_reg(BT_3430_GPIO159);
+	omap_cfg_reg(BT_3430_GPIO109);
+}
 #endif
 
 /* Zoom2 has Qwerty keyboard*/
@@ -741,6 +748,9 @@ static void __init omap_zoom2_init(void)
 	config_wlan_gpio();
 	zoom2_cam_init();
 	zoom2_lcd_tv_panel_init();
+#ifdef CONFIG_WL127X_RFKILL
+	config_btfm_gpios();
+#endif
 }
 
 static struct map_desc zoom2_io_desc[] __initdata = {

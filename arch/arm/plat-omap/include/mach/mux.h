@@ -939,6 +939,10 @@ enum omap34xx_index {
 	D25_34XX_CAM_STROBE,
 	K8_34XX_GPMC_WAIT2,
 
+	/* BTFM Enable GPIOs */
+	BT_3430_GPIO161,
+	BT_3430_GPIO159,
+	BT_3430_GPIO109,
 };
 
 struct omap_mux_cfg {
