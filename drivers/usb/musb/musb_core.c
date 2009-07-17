@@ -112,8 +112,6 @@
 #include "davinci.h"
 #endif
 
-
-
 unsigned musb_debug;
 module_param_named(debug, musb_debug, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug message level. Default = 0");
@@ -2046,6 +2044,8 @@ bad_config:
 			musb_readb(musb->mregs, MUSB_DEVCTL));
 
 	}
+
+	musb_debug_create("driver/musb_hdrc", musb);
 
 #ifdef CONFIG_SYSFS
 	status = device_create_file(dev, &dev_attr_mode);

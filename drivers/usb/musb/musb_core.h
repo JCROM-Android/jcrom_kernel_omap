@@ -63,7 +63,12 @@ struct musb_ep;
 #include "../core/hcd.h"
 #include "musb_host.h"
 
-
+#ifdef CONFIG_USB_MUSB_DEBUG
+extern struct proc_dir_entry *__init
+musb_debug_create(char *name, struct musb *data);
+#else /* CONFIG_USB_MUSB_DEBUG */
+#define musb_debug_create do { } while (0)
+#endif /* CONFIG_USB_MUSB_DEBUG */
 
 #ifdef CONFIG_USB_MUSB_OTG
 
