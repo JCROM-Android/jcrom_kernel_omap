@@ -33,7 +33,7 @@
 
 #define LCD_XRES		800
 #define LCD_YRES		480
-#define LCD_PIXCLOCK_MAX	21625
+#define LCD_PIXCLOCK_MAX	12000
 
 /*NEC NL8048HL11-01B  Manual
  * defines HFB, HSW, HBP, VFP, VSW, VBP as shown below
