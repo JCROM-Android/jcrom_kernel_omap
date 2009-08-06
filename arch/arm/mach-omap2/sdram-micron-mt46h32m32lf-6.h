@@ -21,8 +21,8 @@
 static struct omap_sdrc_params mt46h32m32lf6_sdrc_params[] = {
 	[0] = {
 		.rate	     = 166000000,
-		.actim_ctrla = 0x9a9db4c6,
-		.actim_ctrlb = 0x00011217,
+		.actim_ctrla = 0xaa9db4c6,
+		.actim_ctrlb = 0x00011517,
 		.rfr_ctrl    = 0x0004dc01,
 		.mr	     = 0x00000032,
 	},
@@ -42,8 +42,8 @@ static struct omap_sdrc_params mt46h32m32lf6_sdrc_params[] = {
 	},
 	[3] = {
 		.rate	     = 83000000,
-		.actim_ctrla = 0x51512283,
-		.actim_ctrlb = 0x0001120c,
+		.actim_ctrla = 0xaa9db4c6,
+		.actim_ctrlb = 0x00011517,
 		.rfr_ctrl    = 0x00025501,
 		.mr	     = 0x00000032,
 	},
