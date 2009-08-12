@@ -43,6 +43,7 @@
 #include <mach/gpmc.h>
 #include <mach/dma.h>
 #include <mach/dmtimer.h>
+#include <mach/usb.h>
 
 #include <asm/tlbflush.h>
 
@@ -177,6 +178,11 @@ static void omap3_core_restore_context(void)
 	/* Restore the interrupt controller context */
 	omap3_intc_restore_context();
 	omap_dma_global_context_restore();
+
+	/* Need to clear MUSB Autoidle due to OMAP3 errata 1.164
+	 * This bit is automatically enabled when exiting off-mode
+	 */
+	omap3_musb_clear_autoidle();
 }
 
 /*

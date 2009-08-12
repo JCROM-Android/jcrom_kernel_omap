@@ -90,6 +90,34 @@ static int musb_set_clock(struct clk *clk, int state)
 	return 0;
 }
 
+/* MUSB autoidle gets turned on by when the OMAP3 exits off-mode.
+ * We need this to be cleared to workaround OMAP3430 errata 1.164
+ */
+
+void omap3_musb_clear_autoidle(void)
+{
+	void __iomem *otg_base;
+
+	if (!cpu_is_omap34xx())
+		return;
+
+	if (clk_on == 0)
+		clk_enable(clk_get(NULL, "hsotgusb_ick"));
+
+	otg_base = ioremap(OMAP34XX_HSUSB_OTG_BASE, SZ_4K);
+	if (WARN_ON(!otg_base))
+		return;
+
+	/* Reset OTG controller.  After reset, it will be in
+	 * force-idle, force-standby mode. */
+	__raw_writel(OTG_SYSC_SOFTRESET, otg_base + OTG_SYSCONFIG);
+
+	iounmap(otg_base);
+
+	if (clk_on == 0)
+		clk_disable(clk_get(NULL, "hsotgusb_ick"));
+}
+
 static struct musb_hdrc_eps_bits musb_eps[] = {
 	{	"ep1_tx", 10,	},
 	{	"ep1_rx", 10,	},
