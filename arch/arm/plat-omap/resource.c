@@ -396,7 +396,7 @@ int resource_release(const char *name, struct device *dev)
 	resp = resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_release: Invalid resource name\n");
-		return = -EINVAL;
+		return -EINVAL;
 	}
 
 	mutex_lock(&resp->resource_mutex);
