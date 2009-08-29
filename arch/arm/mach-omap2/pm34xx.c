@@ -320,7 +320,7 @@ static void restore_table_entry(void)
 	restore_control_register(control_reg_value);
 }
 
-void omap_sram_idle(void)
+void omap_sram_idle(int idle)
 {
 	/* Variable to tell what needs to be saved and restored
 	 * in omap_sram_idle*/
@@ -415,8 +415,12 @@ void omap_sram_idle(void)
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
 
-	if (regset_save_on_suspend)
+	if (!idle && regset_save_on_suspend)
 		pm_dbg_regset_save(1);
+#ifdef CONFIG_PM_DEBUG
+	else if (idle)
+		pm_dbg_regset_save(2);
+#endif
 
 	/*
 	 * omap3_arm_context is the location where ARM registers
@@ -550,7 +554,7 @@ static void omap3_pm_idle(void)
 	if (omap_irq_pending() || need_resched())
 		goto out;
 
-	omap_sram_idle();
+	omap_sram_idle(1);
 
 out:
 	local_fiq_enable();
@@ -606,7 +610,7 @@ static int omap3_pm_suspend(void)
 	omap_uart_prepare_suspend();
 
 	regset_save_on_suspend = 1;
-	omap_sram_idle();
+	omap_sram_idle(0);
 	regset_save_on_suspend = 0;
 
 restore:
@@ -1228,6 +1232,7 @@ static void __init configure_vc(void)
 			OMAP3_PRM_VOLTSETUP2_OFFSET);
 
 	pm_dbg_regset_init(1);
+	pm_dbg_regset_init(2);
 }
 
 static int __init omap3_pm_early_init(void)

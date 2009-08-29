@@ -122,7 +122,7 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 	}
 
 	/* Execute ARM wfi */
-	omap_sram_idle();
+	omap_sram_idle(1);
 
 	if (cx->type == OMAP3_STATE_C1) {
 		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_allow_idle);
