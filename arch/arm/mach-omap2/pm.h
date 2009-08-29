@@ -98,7 +98,7 @@ extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
 extern void save_secure_ram_context(u32 *addr);
 extern int omap3_can_sleep(void);
 
-extern void omap_sram_idle(void);
+extern void omap_sram_idle(int idle);
 #ifdef CONFIG_PM
 extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
