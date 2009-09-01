@@ -1120,6 +1120,8 @@ void isp_start(void)
 	if (isp_obj.module.isp_pipeline & OMAP_ISP_PREVIEW)
 		isppreview_enable(1);
 
+	isph3a_notify(0);
+	isp_af_notify(0);
 	return;
 }
 EXPORT_SYMBOL(isp_start);
@@ -1230,6 +1232,8 @@ void isp_stop()
 {
 	int reset;
 
+	isph3a_notify(1);
+	isp_af_notify(1);
 	isp_disable_interrupts();
 	reset = isp_stop_modules();
 	isp_buf_init();
