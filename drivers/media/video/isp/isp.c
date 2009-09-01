@@ -1117,8 +1117,7 @@ static u32 isp_tmp_buf_alloc(size_t size)
  **/
 void isp_start(void)
 {
-	if (isp_obj.module.isp_pipeline & OMAP_ISP_PREVIEW
-	    && is_isppreview_enabled())
+	if (isp_obj.module.isp_pipeline & OMAP_ISP_PREVIEW)
 		isppreview_enable(1);
 
 	return;
@@ -1245,8 +1244,7 @@ EXPORT_SYMBOL(isp_stop);
 
 static void isp_set_buf(struct isp_buf *buf)
 {
-	if (isp_obj.module.isp_pipeline & OMAP_ISP_RESIZER
-	    && is_ispresizer_enabled())
+	if (isp_obj.module.isp_pipeline & OMAP_ISP_RESIZER)
 		ispresizer_set_outaddr(buf->isp_addr);
 	else if (isp_obj.module.isp_pipeline & OMAP_ISP_CCDC)
 		ispccdc_set_outaddr(buf->isp_addr);
@@ -1318,12 +1316,10 @@ static void isp_config_pipeline(struct v4l2_pix_format *pix_input,
 
 	if (pix_output->pixelformat == V4L2_PIX_FMT_UYVY) {
 		isppreview_config_ycpos(YCPOS_YCrYCb);
-		if (is_ispresizer_enabled())
-			ispresizer_config_ycpos(0);
+		ispresizer_config_ycpos(0);
 	} else {
 		isppreview_config_ycpos(YCPOS_CrYCbY);
-		if (is_ispresizer_enabled())
-			ispresizer_config_ycpos(1);
+		ispresizer_config_ycpos(1);
 	}
 
 	return;
