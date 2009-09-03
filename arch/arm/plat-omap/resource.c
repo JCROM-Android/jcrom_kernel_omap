@@ -260,13 +260,13 @@ int resource_register(struct shared_resource *resp)
 		return -EINVAL;
 
 	/* Verify that the resource is not already registered */
-	if (resource_lookup(resp->name))
+	down(&res_mutex);
+	if (_resource_lookup(resp->name))
 		return -EEXIST;
 
 	INIT_LIST_HEAD(&resp->users_list);
 	mutex_init(&resp->resource_mutex);
 
-	down(&res_mutex);
 	/* Add the resource to the resource list */
 	list_add(&resp->node, &res_list);
 
