@@ -32,5 +32,7 @@
 		                                 ( UART2 == uart_no ? IO_ADDRESS(OMAP_UART2_BASE) :\
 					         IO_ADDRESS(OMAP_UART3_BASE) ))
 extern unsigned int fcr[MAX_UARTS];
+int omap_uart_active(int num);
+int omap_uart_cts_wakeup(int uart_no, int state);
 #endif /* __OMAP_SERIAL_H__ */
 
