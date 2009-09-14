@@ -170,7 +170,7 @@ static void __init omap_irq_bank_init_one(struct omap_irq_bank *bank)
 		/* Wait for reset to complete */;
 
 	/* Enable autoidle */
-	intc_bank_write_reg(1 << 0, bank, INTC_SYSCONFIG);
+	intc_bank_write_reg(0 << 0, bank, INTC_SYSCONFIG);
 }
 
 int omap_irq_pending(void)
