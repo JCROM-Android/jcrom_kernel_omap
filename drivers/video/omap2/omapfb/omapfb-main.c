@@ -1617,6 +1617,10 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		u16 w, h;
 		int rotation = (var->rotate + ofbi->rotation[0]) % 4;
 
+		display->get_size(display, &w, &h);
+		var->width = w;
+		var->height = h;
+
 		display->get_resolution(display, &w, &h);
 
 		if (rotation == FB_ROTATE_CW ||
