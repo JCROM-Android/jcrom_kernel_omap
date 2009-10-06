@@ -936,8 +936,11 @@ static irqreturn_t omap34xx_isp_isr(int irq, void *_isp)
 					       " preview\n", __func__);
 				}
 			}
-			if (!isppreview_busy())
+			if (!isppreview_busy()) {
+				isppreview_enable(0);
 				isppreview_config_shadow_registers();
+				isppreview_enable(1);
+			}
 			if (!isppreview_busy())
 				isph3a_update_wb();
 		}
