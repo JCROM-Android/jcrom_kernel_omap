@@ -430,11 +430,8 @@ int resource_release(const char *name, struct device *dev)
 	list_del(&user->node);
 	free_user(user);
 
-	up(&res_mutex);
 	/* Recompute and set the current level for the resource */
 	ret = update_resource_level(resp);
-	return ret;
-
 res_unlock:
 	mutex_unlock(&resp->resource_mutex);
 	return ret;
