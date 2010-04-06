@@ -1286,7 +1286,9 @@ u32 NODEWRAP_Delete(union Trapped_Args *args, void *pr_ctxt)
 	u32 retVal;
 
 	GT_0trace(WCD_debugMask, GT_ENTER, "NODEWRAP_Delete: entered\n");
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->node_lock);
 	retVal = NODE_Delete(args->ARGS_NODE_DELETE.hNode, pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->node_lock);
 
 	return retVal;
 }

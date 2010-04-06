@@ -651,6 +651,9 @@ static int bridge_open(struct inode *ip, struct file *filp)
 	pPctxt = MEM_Calloc(sizeof(struct PROCESS_CONTEXT), MEM_PAGED);
 
 	if (pPctxt != NULL) {
+		mutex_init(&pPctxt->node_lock);
+		mutex_init(&pPctxt->dmm_lock);
+		mutex_init(&pPctxt->strm_lock);
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
 		filp->private_data = pPctxt;
 	}
