@@ -178,15 +178,19 @@ struct PROCESS_CONTEXT{
 
 	/* DSP Node resources */
 	struct NODE_RES_OBJECT *pNodeList;
+	struct mutex node_lock;
 
 	/* DMM resources */
 	struct DMM_RES_OBJECT *pDMMList;
+	struct mutex dmm_lock;
 
 	/* DSP Heap resources */
 	struct DSPHEAP_RES_OBJECT *pDSPHEAPList;
 
 	/* Stream resources */
 	struct STRM_RES_OBJECT *pSTRMList;
+	struct mutex strm_lock;
+
 #ifdef CONFIG_BRIDGE_RECOVERY
 	struct task_struct *task;
 	struct list_head list;
