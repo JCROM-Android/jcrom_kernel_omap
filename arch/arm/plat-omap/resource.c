@@ -166,11 +166,12 @@ static struct users_list *get_user(void)
 		else
 			ind++;
 	}
+	up(&res_mutex);
 	if (ind < MAX_USERS) {
 		/* Pick from the static pool */
 		user = &usr_list[ind];
 		user->usage = STATIC_ALLOC;
-		goto res_unlock;
+		return user;
 	}
 	/* By this time we hope slab is initialized */
 	if (slab_is_available()) {
@@ -187,11 +188,6 @@ static struct users_list *get_user(void)
 				"initial POOL EMPTY before slab init\n");
 		return ERR_PTR(-ENOMEM);
 	}
-
-	return user;
-
-res_unlock:
-	up(&res_mutex);
 
 	return user;
 }
