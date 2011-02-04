@@ -218,6 +218,9 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o \
 					   omap_phy_internal.o
 
+# Android specific board file extensions
+obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda-android.o
+
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
 
 obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
