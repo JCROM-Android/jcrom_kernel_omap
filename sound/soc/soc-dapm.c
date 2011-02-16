@@ -1318,14 +1318,15 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 				   struct list_head *pending)
 {
 	struct snd_soc_card *card = dapm->card;
-	struct snd_soc_dapm_widget *w;
+	struct snd_soc_dapm_widget *w, *_w;
 	int reg, power;
 	unsigned int value = 0;
 	unsigned int mask = 0;
 	unsigned int cur_mask;
 
-	reg = list_first_entry(pending, struct snd_soc_dapm_widget,
-			       power_list)->reg;
+	_w = list_first_entry(pending, struct snd_soc_dapm_widget,
+				power_list);
+	reg = _w->reg;
 
 	list_for_each_entry(w, pending, power_list) {
 		cur_mask = 1 << w->shift;
@@ -1354,7 +1355,7 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 			"pop test : Applying 0x%x/0x%x to %x in %dms\n",
 			value, mask, reg, card->pop_time);
 		pop_wait(card->pop_time);
-		soc_widget_update_bits(w, reg, mask, value);
+		soc_widget_update_bits(_w, reg, mask, value);
 	}
 
 	list_for_each_entry(w, pending, power_list) {
@@ -2853,6 +2854,7 @@ int snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
 {
 	if (stream == NULL)
 		return 0;
+
 	mutex_lock(&rtd->card->dapm_mutex);
 
 	soc_dapm_stream_event(&rtd->platform->dapm, stream, event);
