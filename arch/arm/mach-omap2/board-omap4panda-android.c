@@ -25,6 +25,7 @@ static char *usb_functions_adb[] = {
 };
 
 static char *usb_functions_all[] = {
+	"usb_mass_storage",
 	"adb",
 };
 
@@ -56,8 +57,24 @@ static struct platform_device android_usb_device = {
 	},
 };
 
+static struct usb_mass_storage_platform_data ums_pdata = {
+	.vendor		= "Android",
+	.product	= "UMS Composite",
+	.release	= 1,
+	.nluns		= 1
+};
+
+static struct platform_device android_usb_mass_storage_device = {
+	.name	= "usb_mass_storage",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &ums_pdata,
+	},
+};
+
 static struct platform_device *android_devices[] __initdata = {
 	&android_usb_device,
+	&android_usb_mass_storage_device,
 };
 
 void __init omap4_panda_android_init(void)
