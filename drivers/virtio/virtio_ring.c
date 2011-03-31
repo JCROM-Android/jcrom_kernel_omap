@@ -293,6 +293,12 @@ static inline bool more_used(const struct vring_virtqueue *vq)
 	return vq->last_used_idx != vq->vring.used->idx;
 }
 
+bool virtqueue_more_used(const struct vring_virtqueue *vq)
+{
+	return more_used(vq);
+}
+EXPORT_SYMBOL(virtqueue_more_used);
+
 void *virtqueue_get_buf(struct virtqueue *_vq, unsigned int *len)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
