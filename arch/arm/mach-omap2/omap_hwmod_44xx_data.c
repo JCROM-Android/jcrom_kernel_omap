@@ -2533,7 +2533,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_iss_sysc = {
 
 static struct omap_hwmod_class omap44xx_iss_hwmod_class = {
 	.name	= "iss",
-	.sysc	= &omap44xx_iss_sysc,
+	/* .sysc	= &omap44xx_iss_sysc, */
 };
 
 /* iss */
@@ -5185,7 +5185,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_ipu_c1_hwmod,
 
 	/* iss class */
-/*	&omap44xx_iss_hwmod, */
+	&omap44xx_iss_hwmod,
 
 	/* iva class */
 	&omap44xx_iva_hwmod,
