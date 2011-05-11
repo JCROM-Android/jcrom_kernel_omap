@@ -1,0 +1,96 @@
+/*
+ * Remote processor resources
+ *
+ * Copyright (C) 2011 Texas Instruments, Inc.
+ * Copyright (C) 2011 Google, Inc.
+ *
+ * Fernando Guzman Lugo <fernando.lugo@ti.com>
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ */
+
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/slab.h>
+#include <plat/omap_device.h>
+#include <plat/rpres.h>
+
+static LIST_HEAD(rpres_list);
+
+static struct rpres *_find_by_name(char *name)
+{
+	struct rpres *obj;
+
+	list_for_each_entry(obj, &rpres_list, next)
+		if (!strcmp(obj->name, name))
+			return obj;
+	return NULL;
+}
+
+struct rpres *rpres_get(char *name)
+{
+	return _find_by_name(name);
+}
+EXPORT_SYMBOL(rpres_get);
+
+void rpres_put(struct rpres *obj)
+{
+}
+EXPORT_SYMBOL(rpres_put);
+
+int rpres_start(struct rpres *obj)
+{
+	struct rpres_platform_data *pdata = obj->pdev->dev.platform_data;
+	return pdata->ops->start(obj->pdev);
+}
+EXPORT_SYMBOL(rpres_start);
+
+int rpres_stop(struct rpres *obj)
+{
+	struct rpres_platform_data *pdata = obj->pdev->dev.platform_data;
+	return pdata->ops->stop(obj->pdev);
+}
+EXPORT_SYMBOL(rpres_stop);
+
+static int rpres_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct rpres_platform_data *pdata = dev->platform_data;
+	struct rpres *obj;
+
+	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
+	if (!obj)
+		return -ENOMEM;
+
+	obj->pdev = pdev;
+	obj->name = pdata->name;
+
+	list_add_tail(&obj->next, &rpres_list);
+
+	return 0;
+}
+
+static struct platform_driver omap_rproc_driver = {
+	.probe = rpres_probe,
+	//.remove = __devexit_p(omap_rproc_remove),
+	.driver = {
+		.name = "rpres",
+		.owner = THIS_MODULE,
+	},
+};
+
+static int __init rpres_init(void)
+{
+	return platform_driver_register(&omap_rproc_driver);
+}
+module_init(rpres_init);
+
+static void __exit rpres_exit(void)
+{
+	platform_driver_unregister(&omap_rproc_driver);
+}
+module_exit(rpres_exit);
+
+MODULE_LICENSE("GPL v2");
