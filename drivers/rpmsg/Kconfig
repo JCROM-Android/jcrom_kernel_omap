@@ -37,3 +37,11 @@ config RPMSG_OMX
 	  remote processors.
 
 	  If unsure, say N.
+
+config RPMSG_RESMGR
+	tristate "rpmsg resource manager"
+	depends on VIRTIO && RPMSG
+	---help---
+	  Add Framework base on RPMSG to request and release resources
+	  from a remote Processor.
+	  Say either Y or M. You know you want to.
