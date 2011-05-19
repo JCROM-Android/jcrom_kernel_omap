@@ -70,6 +70,7 @@ void device_pm_init(struct device *dev)
 	dev->power.wakeup = NULL;
 	spin_lock_init(&dev->power.lock);
 	pm_runtime_init(dev);
+	INIT_LIST_HEAD(&dev->power.entry);
 }
 
 /**
@@ -240,7 +241,7 @@ static int pm_op(struct device *dev,
 		}
 		break;
 #endif /* CONFIG_SUSPEND */
-#ifdef CONFIG_HIBERNATION
+#ifdef CONFIG_HIBERNATE_CALLBACKS
 	case PM_EVENT_FREEZE:
 	case PM_EVENT_QUIESCE:
 		if (ops->freeze) {
@@ -267,7 +268,7 @@ static int pm_op(struct device *dev,
 			suspend_report_result(ops->restore, error);
 		}
 		break;
-#endif /* CONFIG_HIBERNATION */
+#endif /* CONFIG_HIBERNATE_CALLBACKS */
 	default:
 		error = -EINVAL;
 	}
@@ -315,7 +316,7 @@ static int pm_noirq_op(struct device *dev,
 		}
 		break;
 #endif /* CONFIG_SUSPEND */
-#ifdef CONFIG_HIBERNATION
+#ifdef CONFIG_HIBERNATE_CALLBACKS
 	case PM_EVENT_FREEZE:
 	case PM_EVENT_QUIESCE:
 		if (ops->freeze_noirq) {
@@ -342,7 +343,7 @@ static int pm_noirq_op(struct device *dev,
 			suspend_report_result(ops->restore_noirq, error);
 		}
 		break;
-#endif /* CONFIG_HIBERNATION */
+#endif /* CONFIG_HIBERNATE_CALLBACKS */
 	default:
 		error = -EINVAL;
 	}
@@ -868,7 +869,7 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 	data.dev = dev;
 	data.tsk = get_current();
 	init_timer_on_stack(&timer);
-	timer.expires = jiffies + HZ * 3;
+	timer.expires = jiffies + HZ * 12;
 	timer.function = dpm_drv_timeout;
 	timer.data = (unsigned long)&data;
 	add_timer(&timer);

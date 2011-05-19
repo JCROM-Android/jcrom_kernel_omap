@@ -916,8 +916,7 @@ int devinet_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		}
 		break;
 	case SIOCKILLADDR:	/* Nuke all connections on this address */
-		ret = 0;
-		tcp_v4_nuke_addr(sin->sin_addr.s_addr);
+		ret = tcp_nuke_addr(net, (struct sockaddr *) sin);
 		break;
 	}
 done:
@@ -1687,7 +1686,7 @@ static void __devinet_sysctl_unregister(struct ipv4_devconf *cnf)
 		return;
 
 	cnf->sysctl = NULL;
-	unregister_sysctl_table(t->sysctl_header);
+	unregister_net_sysctl_table(t->sysctl_header);
 	kfree(t->dev_name);
 	kfree(t);
 }

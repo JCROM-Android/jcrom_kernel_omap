@@ -121,4 +121,10 @@ source "drivers/platform/Kconfig"
 source "drivers/clk/Kconfig"
 
 source "drivers/hwspinlock/Kconfig"
+
+source "drivers/remoteproc/Kconfig"
+
+source "drivers/virtio/Kconfig"
+
+source "drivers/rpmsg/Kconfig"
 endmenu
