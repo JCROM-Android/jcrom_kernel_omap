@@ -71,6 +71,7 @@
 #include <linux/ctype.h>
 #include <linux/ftrace.h>
 #include <linux/slab.h>
+#include <linux/cpuacct.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
@@ -2309,7 +2310,7 @@ unsigned long wait_task_inactive(struct task_struct *p, long match_state)
  * Cause a process which is running on another CPU to enter
  * kernel-mode, without any delay. (to get signals handled.)
  *
- * NOTE: this function doesnt have to take the runqueue lock,
+ * NOTE: this function doesn't have to take the runqueue lock,
  * because all it wants to ensure is that the remote task enters
  * the kernel. If the IPI races and the task has been migrated
  * to another CPU then no harm is done and the purpose has been
@@ -4111,18 +4112,18 @@ need_resched:
 					try_to_wake_up_local(to_wakeup);
 			}
 			deactivate_task(rq, prev, DEQUEUE_SLEEP);
+
+			/*
+			 * If we are going to sleep and we have plugged IO queued, make
+			 * sure to submit it to avoid deadlocks.
+			 */
+			if (blk_needs_flush_plug(prev)) {
+				raw_spin_unlock(&rq->lock);
+				blk_schedule_flush_plug(prev);
+				raw_spin_lock(&rq->lock);
+			}
 		}
 		switch_count = &prev->nvcsw;
-	}
-
-	/*
-	 * If we are going to sleep and we have plugged IO queued, make
-	 * sure to submit it to avoid deadlocks.
-	 */
-	if (prev->state != TASK_RUNNING && blk_needs_flush_plug(prev)) {
-		raw_spin_unlock(&rq->lock);
-		blk_flush_plug(prev);
-		raw_spin_lock(&rq->lock);
 	}
 
 	pre_schedule(rq, prev);
@@ -4997,7 +4998,7 @@ recheck:
 	 */
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
 	/*
-	 * To be able to change p->policy safely, the apropriate
+	 * To be able to change p->policy safely, the appropriate
 	 * runqueue lock must be held.
 	 */
 	rq = __task_rq_lock(p);
@@ -5009,6 +5010,17 @@ recheck:
 		__task_rq_unlock(rq);
 		raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 		return -EINVAL;
+	}
+
+	/*
+	 * If not changing anything there's no need to proceed further:
+	 */
+	if (unlikely(policy == p->policy && (!rt_policy(policy) ||
+			param->sched_priority == p->rt_priority))) {
+
+		__task_rq_unlock(rq);
+		raw_spin_unlock_irqrestore(&p->pi_lock, flags);
+		return 0;
 	}
 
 #ifdef CONFIG_RT_GROUP_SCHED
@@ -5705,7 +5717,7 @@ void show_state_filter(unsigned long state_filter)
 	do_each_thread(g, p) {
 		/*
 		 * reset the NMI-timeout, listing all files on a slow
-		 * console might take alot of time:
+		 * console might take a lot of time:
 		 */
 		touch_nmi_watchdog();
 		if (!state_filter || (p->state & state_filter))
@@ -6320,6 +6332,9 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		break;
 #endif
 	}
+
+	update_max_interval();
+
 	return NOTIFY_OK;
 }
 
@@ -8290,13 +8305,24 @@ static inline int preempt_count_equals(int preempt_offset)
 	return (nested == preempt_offset);
 }
 
+static int __might_sleep_init_called;
+int __init __might_sleep_init(void)
+{
+	__might_sleep_init_called = 1;
+	return 0;
+}
+early_initcall(__might_sleep_init);
+
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
 #ifdef in_atomic
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
 	if ((preempt_count_equals(preempt_offset) && !irqs_disabled()) ||
-	    system_state != SYSTEM_RUNNING || oops_in_progress)
+	    oops_in_progress)
+		return;
+	if (system_state != SYSTEM_RUNNING &&
+	    (!__might_sleep_init_called || system_state != SYSTEM_BOOTING))
 		return;
 	if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 		return;
@@ -9048,6 +9074,15 @@ cpu_cgroup_destroy(struct cgroup_subsys *ss, struct cgroup *cgrp)
 static int
 cpu_cgroup_can_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 {
+	if ((current != tsk) && (!capable(CAP_SYS_NICE))) {
+		const struct cred *cred = current_cred(), *tcred;
+
+		tcred = __task_cred(tsk);
+
+		if (cred->euid != tcred->uid && cred->euid != tcred->suid)
+			return -EPERM;
+	}
+
 #ifdef CONFIG_RT_GROUP_SCHED
 	if (!sched_rt_can_attach(cgroup_tg(cgrp), tsk))
 		return -EINVAL;
@@ -9208,7 +9243,29 @@ struct cpuacct {
 	u64 __percpu *cpuusage;
 	struct percpu_counter cpustat[CPUACCT_STAT_NSTATS];
 	struct cpuacct *parent;
+	struct cpuacct_charge_calls *cpufreq_fn;
+	void *cpuacct_data;
 };
+
+static struct cpuacct *cpuacct_root;
+
+/* Default calls for cpufreq accounting */
+static struct cpuacct_charge_calls *cpuacct_cpufreq;
+int cpuacct_register_cpufreq(struct cpuacct_charge_calls *fn)
+{
+	cpuacct_cpufreq = fn;
+
+	/*
+	 * Root node is created before platform can register callbacks,
+	 * initalize here.
+	 */
+	if (cpuacct_root && fn) {
+		cpuacct_root->cpufreq_fn = fn;
+		if (fn->init)
+			fn->init(&cpuacct_root->cpuacct_data);
+	}
+	return 0;
+}
 
 struct cgroup_subsys cpuacct_subsys;
 
@@ -9244,8 +9301,16 @@ static struct cgroup_subsys_state *cpuacct_create(
 		if (percpu_counter_init(&ca->cpustat[i], 0))
 			goto out_free_counters;
 
+	ca->cpufreq_fn = cpuacct_cpufreq;
+
+	/* If available, have platform code initalize cpu frequency table */
+	if (ca->cpufreq_fn && ca->cpufreq_fn->init)
+		ca->cpufreq_fn->init(&ca->cpuacct_data);
+
 	if (cgrp->parent)
 		ca->parent = cgroup_ca(cgrp->parent);
+	else
+		cpuacct_root = ca;
 
 	return &ca->css;
 
@@ -9373,6 +9438,32 @@ static int cpuacct_stats_show(struct cgroup *cgrp, struct cftype *cft,
 	return 0;
 }
 
+static int cpuacct_cpufreq_show(struct cgroup *cgrp, struct cftype *cft,
+		struct cgroup_map_cb *cb)
+{
+	struct cpuacct *ca = cgroup_ca(cgrp);
+	if (ca->cpufreq_fn && ca->cpufreq_fn->cpufreq_show)
+		ca->cpufreq_fn->cpufreq_show(ca->cpuacct_data, cb);
+
+	return 0;
+}
+
+/* return total cpu power usage (milliWatt second) of a group */
+static u64 cpuacct_powerusage_read(struct cgroup *cgrp, struct cftype *cft)
+{
+	int i;
+	struct cpuacct *ca = cgroup_ca(cgrp);
+	u64 totalpower = 0;
+
+	if (ca->cpufreq_fn && ca->cpufreq_fn->power_usage)
+		for_each_present_cpu(i) {
+			totalpower += ca->cpufreq_fn->power_usage(
+					ca->cpuacct_data);
+		}
+
+	return totalpower;
+}
+
 static struct cftype files[] = {
 	{
 		.name = "usage",
@@ -9386,6 +9477,14 @@ static struct cftype files[] = {
 	{
 		.name = "stat",
 		.read_map = cpuacct_stats_show,
+	},
+	{
+		.name =  "cpufreq",
+		.read_map = cpuacct_cpufreq_show,
+	},
+	{
+		.name = "power",
+		.read_u64 = cpuacct_powerusage_read
 	},
 };
 
@@ -9416,6 +9515,10 @@ static void cpuacct_charge(struct task_struct *tsk, u64 cputime)
 	for (; ca; ca = ca->parent) {
 		u64 *cpuusage = per_cpu_ptr(ca->cpuusage, cpu);
 		*cpuusage += cputime;
+
+		/* Call back into platform code to account for CPU speeds */
+		if (ca->cpufreq_fn && ca->cpufreq_fn->charge)
+			ca->cpufreq_fn->charge(ca->cpuacct_data, cputime, cpu);
 	}
 
 	rcu_read_unlock();

@@ -854,7 +854,7 @@ extern int __weak arch_sd_sibiling_asym_packing(void);
 
 /*
  * Optimise SD flags for power savings:
- * SD_BALANCE_NEWIDLE helps agressive task consolidation and power savings.
+ * SD_BALANCE_NEWIDLE helps aggressive task consolidation and power savings.
  * Keep default SD flags if sched_{smt,mc}_power_saving=0
  */
 
@@ -1254,6 +1254,9 @@ struct task_struct {
 #endif
 
 	struct mm_struct *mm, *active_mm;
+#ifdef CONFIG_COMPAT_BRK
+	unsigned brk_randomized:1;
+#endif
 #if defined(SPLIT_RSS_COUNTING)
 	struct task_rss_stat	rss_stat;
 #endif
@@ -1534,6 +1537,9 @@ struct task_struct {
 		unsigned long memsw_nr_pages; /* uncharged mem+swap usage */
 	} memcg_batch;
 #endif
+#ifdef CONFIG_HAVE_HW_BREAKPOINT
+	atomic_t ptrace_bp_refcnt;
+#endif
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
@@ -1717,6 +1723,9 @@ static inline void put_task_struct(struct task_struct *t)
 
 extern void task_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
 extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
+
+extern int task_free_register(struct notifier_block *n);
+extern int task_free_unregister(struct notifier_block *n);
 
 /*
  * Per process flags

@@ -105,7 +105,7 @@ int mmc_go_idle(struct mmc_host *host)
 	 * that in case of hardware that won't pull up DAT3/nCS otherwise.
 	 *
 	 * SPI hosts ignore ios.chip_select; it's managed according to
-	 * rules that must accomodate non-MMC slaves which this layer
+	 * rules that must accommodate non-MMC slaves which this layer
 	 * won't even know about.
 	 */
 	if (!mmc_host_is_spi(host)) {
@@ -387,6 +387,15 @@ int mmc_spi_set_crc(struct mmc_host *host, int use_crc)
 	return err;
 }
 
+/**
+ *	mmc_switch - modify EXT_CSD register
+ *	@card: the MMC card associated with the data transfer
+ *	@set: cmd set values
+ *	@index: EXT_CSD register index
+ *	@value: value to program into EXT_CSD register
+ *
+ *	Modifies the EXT_CSD register for selected card.
+ */
 int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value)
 {
 	int err;
@@ -433,6 +442,8 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(mmc_switch);
 
 int mmc_send_status(struct mmc_card *card, u32 *status)
 {
