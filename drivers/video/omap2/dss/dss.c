@@ -88,7 +88,7 @@ static const char * const dss_generic_clk_source_names[] = {
 	[OMAP_DSS_CLK_SRC_FCK]			= "DSS_FCK",
 };
 
-static void dss_clk_enable_all_no_ctx(void);
+void dss_clk_enable_all_no_ctx(void);
 static void dss_clk_disable_all_no_ctx(void);
 static void dss_clk_enable_no_ctx(enum dss_clock clks);
 static void dss_clk_disable_no_ctx(enum dss_clock clks);
@@ -993,7 +993,7 @@ void dss_clk_disable(enum dss_clock clks)
 	dss_clk_disable_no_ctx(clks);
 }
 
-static void dss_clk_enable_all_no_ctx(void)
+void dss_clk_enable_all_no_ctx(void)
 {
 	enum dss_clock clks;
 

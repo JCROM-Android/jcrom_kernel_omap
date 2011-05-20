@@ -3344,10 +3344,14 @@ void dispc_disable_sidle(void)
 	REG_FLD_MOD(DISPC_SYSCONFIG, 1, 4, 3);	/* SIDLEMODE: no idle */
 }
 
+void dss_clk_enable_all_no_ctx(void);
 static void _omap_dispc_initial_config(void)
 {
 	u32 l;
 
+	// XXX : take an extra clock reff here
+	dss_clk_enable_all_no_ctx();
+	msleep(100);
 	l = dispc_read_reg(DISPC_SYSCONFIG);
 	l = FLD_MOD(l, 2, 13, 12);	/* MIDLEMODE: smart standby */
 	l = FLD_MOD(l, 2, 4, 3);	/* SIDLEMODE: smart idle */
