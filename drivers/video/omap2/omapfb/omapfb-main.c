@@ -1021,8 +1021,22 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 		if (r)
 			goto err;
 
-		if (!init && ovl->manager)
+		if (!init && ovl->manager) {
+			struct omap_dss_device *dev;
+			struct omap_dss_driver *drv;
+
 			ovl->manager->apply(ovl->manager);
+
+			drv = ovl->manager->device->driver;
+			dev = ovl->manager->device;
+
+			if (dev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+				drv->get_update_mode(dev) != OMAP_DSS_UPDATE_AUTO)
+				drv->update(dev, 0, 0,
+					    dev->panel.timings.x_res,
+					    dev->panel.timings.y_res);
+			ovl->manager->wait_for_vsync(ovl->manager);
+		}
 	}
 	return 0;
 err:
@@ -1818,7 +1832,7 @@ static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		}
 
 		var->xres_virtual = var->xres;
-		var->yres_virtual = var->yres;
+		var->yres_virtual = var->yres * 2;
 
 		if (!var->bits_per_pixel) {
 			switch (omapfb_get_recommended_bpp(fbdev, display)) {
@@ -1839,7 +1853,7 @@ static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		var->xres = 320;
 		var->yres = 240;
 		var->xres_virtual = var->xres;
-		var->yres_virtual = var->yres;
+		var->yres_virtual = var->yres * 2;
 		if (!var->bits_per_pixel)
 			var->bits_per_pixel = 16;
 	}
