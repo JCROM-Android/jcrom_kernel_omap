@@ -28,6 +28,13 @@
 #define __IMG_LINUX_MM_H__
 
 #include <linux/version.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38))
+#ifndef AUTOCONF_INCLUDED
+#include <linux/config.h>
+#endif
+#endif
+
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/list.h>
