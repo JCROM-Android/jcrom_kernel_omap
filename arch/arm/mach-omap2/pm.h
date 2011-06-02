@@ -19,8 +19,12 @@ extern void *omap3_secure_ram_storage;
 extern void omap3_pm_off_mode_enable(int);
 extern void omap_sram_idle(void);
 extern int omap3_can_sleep(void);
+extern int omap4_can_sleep(void);
 extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern int omap3_idle_init(void);
+extern int omap4_idle_init(void);
+extern void omap4_enter_sleep(unsigned int cpu, unsigned int power_state);
+extern void omap4_trigger_ioctrl(void);
 
 #if defined(CONFIG_PM_OPP)
 extern int omap3_opp_init(void);
@@ -36,11 +40,16 @@ static inline int omap4_opp_init(void)
 }
 #endif
 
+/*
+ * cpuidle mach specific parameters
+ *
+ * The board code can override the default C-states definition using
+ * omap3_pm_init_cpuidle
+ */
 struct cpuidle_params {
-	u8  valid;
-	u32 sleep_latency;
-	u32 wake_latency;
-	u32 threshold;
+	u32 exit_latency;	/* exit_latency = sleep + wake-up latencies */
+	u32 target_residency;
+	u8 valid;		/* validates the C-state */
 };
 
 #if defined(CONFIG_PM) && defined(CONFIG_CPU_IDLE)
@@ -71,10 +80,6 @@ extern u32 sleep_while_idle;
 #define omap2_pm_debug				0
 #define enable_off_mode 0
 #define sleep_while_idle 0
-#endif
-
-#if defined(CONFIG_CPU_IDLE)
-extern void omap3_cpuidle_update_states(u32, u32);
 #endif
 
 #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
@@ -124,16 +129,56 @@ static inline int omap_devinit_smartreflex(void)
 static inline void omap_enable_smartreflex_on_init(void) {}
 #endif
 
-#ifdef CONFIG_TWL4030_CORE
-extern int omap3_twl_init(void);
-extern int omap4_twl_init(void);
-extern int omap3_twl_set_sr_bit(bool enable);
+/**
+ * struct omap_pmic_map - Describe the OMAP PMIC data for OMAP
+ * @name:	name of the voltage domain
+ * @pmic_data:	pmic data associated with it
+ * @omap_chip:	initialize with OMAP_CHIP_INIT the OMAP chips this data maps to
+ * @special_action: callback for any specific action to take for that map
+ *
+ * Since we support multiple PMICs each potentially functioning on multiple
+ * OMAP devices, we describe the parameters in a map allowing us to reuse the
+ * data as necessary.
+ */
+struct omap_pmic_map {
+	char			*name;
+	struct omap_voltdm_pmic	*pmic_data;
+	struct omap_chip_id	omap_chip;
+	int			(*special_action)(struct voltagedomain *);
+};
+
+#ifdef CONFIG_PM
+extern int omap_pmic_register_data(struct omap_pmic_map *map);
 #else
-static inline int omap3_twl_init(void)
+static inline int omap_pmic_register_data(struct omap_pmic_map *map)
 {
 	return -EINVAL;
 }
-static inline int omap4_twl_init(void)
+#endif
+extern void omap_pmic_init(void);
+
+#ifdef CONFIG_TWL4030_CORE
+extern int omap_twl_init(void);
+extern int omap3_twl_set_sr_bit(bool enable);
+#else
+static inline int omap_twl_init(void)
+{
+	return -EINVAL;
+}
+#endif
+
+#ifdef CONFIG_OMAP_TPS6236X
+extern int omap_tps6236x_board_setup(bool use_62361, int gpio_vsel0,
+	                int gpio_vsel1, int pull0, int pull1);
+extern int omap_tps6236x_init(void);
+
+#else
+static inline int omap_tps6236x_board_setup(bool use_62361, int gpio_vsel0,
+	                int gpio_vsel1, int pull0, int pull1)
+{
+	return -EINVAL;
+}
+static inline int omap_tps6236x_init(void)
 {
 	return -EINVAL;
 }
