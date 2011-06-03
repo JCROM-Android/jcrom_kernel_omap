@@ -703,6 +703,8 @@ static int dss_init(void)
 
 	_omap_dss_reset();
 
+	dss_write_reg(DSS_CONTROL, 0);
+
 	/* autoidle */
 	REG_FLD_MOD(DSS_SYSCONFIG, 1, 0, 0);
 
