@@ -8,8 +8,7 @@
  * @name: panel name
  * @use_ext_te: use external TE
  * @ext_te_gpio: external TE GPIO
- * @esd_interval: interval of ESD checks, 0 = disabled (ms)
- * @ulps_timeout: time to wait before entering ULPS, 0 = disabled (ms)
+ * @use_esd_check: perform ESD checks
  * @max_backlight_level: maximum backlight level
  * @set_backlight: pointer to backlight set function
  * @get_backlight: pointer to backlight get function
@@ -22,8 +21,7 @@ struct nokia_dsi_panel_data {
 	bool use_ext_te;
 	int ext_te_gpio;
 
-	unsigned esd_interval;
-	unsigned ulps_timeout;
+	bool use_esd_check;
 
 	int max_backlight_level;
 	int (*set_backlight)(struct omap_dss_device *dssdev, int level);
