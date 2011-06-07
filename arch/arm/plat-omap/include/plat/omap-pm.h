@@ -356,7 +356,7 @@ unsigned long omap_pm_cpu_get_freq(void);
  * driver must restore device context.   If the number of context losses
  * exceeds the maximum positive integer, the function will wrap to 0 and
  * continue counting.  Returns the number of context losses for this device,
- * or -EINVAL upon error.
+ * or negative value upon error.
  */
 int omap_pm_get_dev_context_loss_count(struct device *dev);
 
