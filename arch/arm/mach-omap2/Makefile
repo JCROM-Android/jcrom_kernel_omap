@@ -281,3 +281,5 @@ disp-$(CONFIG_OMAP2_DSS)		:= display.o
 obj-y					+= $(disp-m) $(disp-y)
 
 obj-$(CONFIG_OMAP_REMOTE_PROC)		+= remoteproc.o
+
+obj-$(CONFIG_OMAP4_REGDUMP)		+= omap4_dump.o

@@ -354,6 +354,13 @@ config OMAP_ALLOW_OSWR
 config OMAP_TPS6236X
        bool
 
+config OMAP4_REGDUMP
+       bool "include support for register dumping"
+       depends on ARCH_OMAP4
+       default n
+       help
+         Useful for debugging
+
 endmenu
 
 endif
