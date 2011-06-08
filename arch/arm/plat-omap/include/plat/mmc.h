@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/mmc/host.h>
 
+#include <asm/mach/mmc.h>
 #include <plat/board.h>
 
 #define OMAP15XX_NR_MMC		1
@@ -143,6 +144,9 @@ struct omap_mmc_platform_data {
 		/* Card detection IRQs */
 		int card_detect_irq;
 		int (*card_detect)(struct device *dev, int slot);
+
+		/* Additional mmc configuration */
+		struct mmc_platform_data mmc_data;
 
 		unsigned int ban_openended:1;
 
