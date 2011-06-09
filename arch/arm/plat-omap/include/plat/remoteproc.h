@@ -37,6 +37,8 @@ struct omap_rproc_pdata {
 	const char *firmware;
 	const struct rproc_ops *ops;
 	const struct rproc_mem_entry *memory_maps;
+	unsigned sus_timeout;
+	char *sus_mbox_name;
 };
 
 #endif /* _PLAT_REMOTEPROC_H */

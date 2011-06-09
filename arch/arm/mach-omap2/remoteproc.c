@@ -102,12 +102,30 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.oh_name	= "ipu_c0",
 		.oh_name_opt	= "ipu_c1",
 		.memory_maps	= ipu_memory_maps,
+		.sus_timeout	= 5000,
+		.sus_mbox_name	= "mailbox-1",
 	},
 };
 
+/*
+ * we hook custom deactivate function because of the need of reseting
+ * remote processor when it is deactivated and the lack of a
+ * omap_device_shutdown_hwmods function
+ */
+static int omap_rproc_deactivate_hwmod(struct omap_device *od)
+{
+	int i;
+
+	for (i = 0; i < od->hwmods_cnt; i++)
+		omap_hwmod_shutdown(od->hwmods[i]);
+
+	return 0;
+
+}
+
 static struct omap_device_pm_latency omap_rproc_latency[] = {
 	{
-		.deactivate_func = omap_device_idle_hwmods,
+		.deactivate_func = omap_rproc_deactivate_hwmod,
 		.activate_func = omap_device_enable_hwmods,
 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
 	},
