@@ -113,6 +113,8 @@ struct rproc;
 struct rproc_ops {
 	int (*start)(struct rproc *rproc, u64 bootaddr);
 	int (*stop)(struct rproc *rproc);
+	int (*suspend)(struct rproc *rproc, bool froce);
+	int (*resume)(struct rproc *rproc);
 	int (*iommu_init)(struct rproc *, int (*)(struct rproc *, u64, u32));
 	int (*iommu_exit)(struct rproc *);
 };
@@ -146,6 +148,9 @@ enum rproc_state {
  */
 enum rproc_event {
 	RPROC_ERROR,
+	RPROC_PRE_SUSPEND,
+	RPROC_POS_SUSPEND,
+	RPROC_RESUME,
 };
 
 #define RPROC_MAX_NAME	100
@@ -192,6 +197,17 @@ struct rproc {
 	struct completion firmware_loading_complete;
 	struct work_struct mmufault_work;
 	struct blocking_notifier_head nb_error;
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	unsigned sus_timeout;
+	void *standby;
+	struct blocking_notifier_head nb_presus;
+	struct blocking_notifier_head nb_possus;
+	struct blocking_notifier_head nb_resume;
+	bool suspended;
+	int (*resume)(struct rproc *);
+	int (*suspend)(struct rproc *);
+	int (*idle)(struct rproc *);
+#endif
 };
 
 struct rproc *rproc_get(const char *);
@@ -199,7 +215,9 @@ void rproc_put(struct rproc *);
 int rproc_event_register(struct rproc *, struct notifier_block *, int);
 int rproc_event_unregister(struct rproc *, struct notifier_block *, int);
 int rproc_register(struct device *, const char *, const struct rproc_ops *,
-		const char *, const struct rproc_mem_entry *, struct module *);
+		const char *, const struct rproc_mem_entry *, struct module *,
+		unsigned int timeout);
 int rproc_unregister(const char *);
+void rproc_last_busy(struct rproc *);
 
 #endif /* REMOTEPROC_H */

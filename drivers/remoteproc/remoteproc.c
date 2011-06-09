@@ -35,6 +35,7 @@
 #include <linux/list.h>
 #include <linux/debugfs.h>
 #include <linux/remoteproc.h>
+#include <linux/pm_runtime.h>
 
 /* list of available remote processors on this board */
 static LIST_HEAD(rprocs);
@@ -165,6 +166,9 @@ static int rproc_mmu_fault_isr(struct rproc *rproc, u64 da, u32 flags)
 	dev_err(rproc->dev, "Enter %s\n", __func__);
 	rproc->state = RPROC_CRASHED;
 	schedule_work(&rproc->mmufault_work);
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	pm_runtime_dont_use_autosuspend(rproc->dev);
+#endif
 
 	return -EFAULT;
 }
@@ -178,6 +182,17 @@ static int _event_notify(struct rproc *rproc, int type, void *data)
 		nh = &rproc->nb_error;
 		rproc->state = RPROC_CRASHED;
 		break;
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	case RPROC_PRE_SUSPEND:
+		nh = &rproc->nb_presus;
+		break;
+	case RPROC_POS_SUSPEND:
+		nh = &rproc->nb_possus;
+		break;
+	case RPROC_RESUME:
+		nh = &rproc->nb_resume;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -216,6 +231,14 @@ static void rproc_start(struct rproc *rproc, u64 bootaddr)
 		dev_err(dev, "can't start rproc %s: %d\n", rproc->name, err);
 		goto unlock_mutext;
 	}
+
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	pm_runtime_set_active(rproc->dev);
+	pm_runtime_enable(rproc->dev);
+	pm_runtime_get_noresume(rproc->dev);
+	pm_runtime_mark_last_busy(rproc->dev);
+	pm_runtime_put_autosuspend(rproc->dev);
+#endif
 
 	rproc->state = RPROC_RUNNING;
 
@@ -531,6 +554,16 @@ void rproc_put(struct rproc *rproc)
 	 * this is important, because the fw loading might have failed.
 	 */
 	if (rproc->state == RPROC_RUNNING || rproc->state == RPROC_CRASHED) {
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+		/*
+		 * Call resume, it will cancel any pending autosuspend,
+		 * so that no callback is executed after the device is stopped.
+		 * Device stop function takes care of shuting down the device.
+		 */
+		pm_runtime_get_sync(rproc->dev);
+		pm_runtime_disable(rproc->dev);
+		pm_runtime_set_suspended(rproc->dev);
+#endif
 		ret = rproc->ops->stop(rproc);
 		if (ret) {
 			dev_err(dev, "can't stop rproc %s: %d\n", rproc->name,
@@ -576,6 +609,17 @@ static int _register(struct rproc *rproc,
 	case RPROC_ERROR:
 		nh = &rproc->nb_error;
 		break;
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	case RPROC_PRE_SUSPEND:
+		nh = &rproc->nb_presus;
+		break;
+	case RPROC_POS_SUSPEND:
+		nh = &rproc->nb_possus;
+		break;
+	case RPROC_RESUME:
+		nh = &rproc->nb_resume;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -598,12 +642,93 @@ int rproc_event_unregister(struct rproc *rproc,
 }
 EXPORT_SYMBOL_GPL(rproc_event_unregister);
 
+void rproc_last_busy(struct rproc *rproc)
+{
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	struct device *dev = rproc->dev;
+
+	if (!pm_runtime_autosuspend_expiration(dev) || rproc->suspended) {
+		rproc->suspended = false;
+		pm_runtime_get_sync(dev);
+		pm_runtime_mark_last_busy(dev);
+		pm_runtime_put_autosuspend(dev);
+	}
+	pm_runtime_mark_last_busy(dev);
+#endif
+}
+EXPORT_SYMBOL(rproc_last_busy);
+
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+static int rproc_resume(struct rproc *rproc)
+{
+	dev_err(rproc->dev, "Enter %s\n", __func__);
+	_event_notify(rproc, RPROC_RESUME, NULL);
+	return 0;
+}
+
+static int rproc_suspend(struct rproc *rproc)
+{
+	int ret;
+	unsigned to;
+	struct device *dev = rproc->dev;
+
+	dev_err(dev, "Enter %s\n", __func__);
+
+	rproc->suspended = true;
+
+	ret = _event_notify(rproc, RPROC_PRE_SUSPEND, NULL);
+	/*
+	 * if rproc user avoid suspend that means it is still using rproc
+	 * it is ok lets go to abort suspend.
+	 */
+	if (ret) {
+		dev_err(dev, "rproc user avoid suspend %d\n", ret);
+		ret = -EBUSY;
+		goto abort;
+	}
+
+	/*
+	 * Lets try to suspend remoteproc, if it is still doing something
+	 * (no idle) if should returned failed.
+	 */
+	if (rproc->ops->suspend)
+		ret = rproc->ops->suspend(rproc, false);
+	/*
+	 * if fails remote processor still in used, however rproc users were
+	 * not awared of that, it is not an issue either, lets abort.
+	 */
+	if (ret) {
+		dev_err(dev, "remote processor busy avoid suspend %d\n", ret);
+		goto abort;
+	}
+
+	/* we are note interested in the user return value */
+	_event_notify(rproc, RPROC_POS_SUSPEND, NULL);
+
+	return 0;
+abort:
+	rproc->suspended = false;
+	pm_runtime_mark_last_busy(dev);
+	to = jiffies_to_msecs(pm_runtime_autosuspend_expiration(dev) - jiffies);
+	pm_schedule_suspend(dev, to);
+	return ret;
+}
+
+static int rproc_idle(struct rproc *rproc)
+{
+	dev_dbg(rproc->dev, "Enter %s\n", __func__);
+	return 0;
+}
+#endif
+
 int rproc_register(struct device *dev, const char *name,
 				const struct rproc_ops *ops,
 				const char *firmware,
 				const struct rproc_mem_entry *memory_maps,
-				struct module *owner)
+				struct module *owner,
+				unsigned sus_timeout)
 {
+	struct platform_device *pdev = to_platform_device(dev);
 	struct rproc *rproc;
 
 	if (!dev || !name || !ops)
@@ -621,6 +746,12 @@ int rproc_register(struct device *dev, const char *name,
 	rproc->firmware = firmware;
 	rproc->owner = owner;
 	rproc->memory_maps = memory_maps;
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	rproc->sus_timeout = sus_timeout;
+	rproc->resume = rproc_resume;
+	rproc->suspend = rproc_suspend;
+	rproc->idle = rproc_idle;
+#endif
 
 	mutex_init(&rproc->lock);
 	INIT_WORK(&rproc->mmufault_work, rproc_mmufault_work);
@@ -631,6 +762,8 @@ int rproc_register(struct device *dev, const char *name,
 	spin_lock(&rprocs_lock);
 	list_add_tail(&rproc->next, &rprocs);
 	spin_unlock(&rprocs_lock);
+
+	platform_set_drvdata(pdev, rproc);
 
 	dev_info(dev, "%s is available\n", name);
 
@@ -645,6 +778,15 @@ int rproc_register(struct device *dev, const char *name,
 
 	debugfs_create_file("name", 0400, rproc->dbg_dir, rproc,
 							&rproc_name_ops);
+
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	BLOCKING_INIT_NOTIFIER_HEAD(&rproc->nb_presus);
+	BLOCKING_INIT_NOTIFIER_HEAD(&rproc->nb_possus);
+	BLOCKING_INIT_NOTIFIER_HEAD(&rproc->nb_resume);
+	pm_runtime_allow(dev);
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_set_autosuspend_delay(dev, rproc->sus_timeout);
+#endif
 
 out:
 	return 0;

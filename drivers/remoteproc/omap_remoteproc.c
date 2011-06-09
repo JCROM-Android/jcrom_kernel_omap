@@ -21,15 +21,64 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/remoteproc.h>
+#include <linux/sched.h>
 
 #include <plat/iommu.h>
 #include <plat/omap_device.h>
 #include <plat/remoteproc.h>
+#include <plat/mailbox.h>
+
+#define PM_SUSPEND_MBOX	0xffffff07
+#define PM_SUSPEND_TIMEOUT 300
+#define CM_MPU_M3_CLKCTRL 0x4a008920
+#define STBYST (1 << 18)
 
 struct omap_rproc_priv {
 	struct iommu *iommu;
 	int (*iommu_cb)(struct rproc *, u64, u32);
+	struct omap_mbox *mbox;
+	void __iomem *stb;
 };
+
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+
+static bool _may_suspend(struct rproc *rproc)
+{
+	struct omap_rproc_priv *rpp = rproc->priv;
+
+	return readl(rpp->stb) & STBYST;
+}
+
+/*
+ * We don't take in account anything and send the suspend
+ * request to the remote processor. Remote processor needs to
+ * attend it inmmeaditely and suspend an error returned by
+ * this function means serious error in remote processor
+ */
+static int _suspend(struct rproc *rproc)
+{
+	struct omap_rproc_priv *rpp = rproc->priv;
+	unsigned long timeout = PM_SUSPEND_TIMEOUT + jiffies;
+
+	omap_mbox_msg_send(rpp->mbox, PM_SUSPEND_MBOX);
+
+	while (time_after(timeout, jiffies)) {
+		if (readl(rpp->stb) & STBYST)
+			return 0;
+		schedule();
+	}
+
+	return -EFAULT;
+}
+
+static int omap_suspend(struct rproc *rproc, bool force)
+{
+	if (force || _may_suspend(rproc))
+		return _suspend(rproc);
+
+	return -EBUSY;
+}
+#endif
 
 static int
 omap_rproc_map(struct device *dev, struct iommu *obj, u32 da, u32 pa, u32 size)
@@ -133,6 +182,16 @@ err_mmu:
 static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 {
 	struct platform_device *pdev = to_platform_device(rproc->dev);
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	struct omap_rproc_pdata *pdata = rproc->dev->platform_data;
+	struct omap_rproc_priv *rpp = rproc->priv;
+
+	rpp->mbox = omap_mbox_get(pdata->sus_mbox_name, NULL);
+	if (IS_ERR(rpp->mbox))
+		return PTR_ERR(rpp->mbox);
+
+	rpp->stb = ioremap(CM_MPU_M3_CLKCTRL, sizeof(rpp->stb));
+#endif
 
 	return omap_device_enable(pdev);
 }
@@ -150,13 +209,22 @@ static int omap_rproc_iommu_exit(struct rproc *rproc)
 static inline int omap_rproc_stop(struct rproc *rproc)
 {
 	struct platform_device *pdev = to_platform_device(rproc->dev);
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	struct omap_rproc_priv *rpp = rproc->priv;
 
-	return omap_device_shutdown(pdev);
+	omap_mbox_put(rpp->mbox, NULL);
+	iounmap(rpp->stb);
+#endif
+
+	return omap_device_idle(pdev);
 }
 
 static struct rproc_ops omap_rproc_ops = {
 	.start = omap_rproc_start,
 	.stop = omap_rproc_stop,
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	.suspend = omap_suspend,
+#endif
 	.iommu_init = omap_rproc_iommu_init,
 	.iommu_exit = omap_rproc_iommu_exit,
 };
@@ -167,7 +235,7 @@ static int omap_rproc_probe(struct platform_device *pdev)
 
 	return rproc_register(&pdev->dev, pdata->name, &omap_rproc_ops,
 				pdata->firmware, pdata->memory_maps,
-				THIS_MODULE);
+				THIS_MODULE, pdata->sus_timeout);
 }
 
 static int __devexit omap_rproc_remove(struct platform_device *pdev)
@@ -177,12 +245,47 @@ static int __devexit omap_rproc_remove(struct platform_device *pdev)
 	return rproc_unregister(pdata->name);
 }
 
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+static int omap_rproc_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rproc *rproc = platform_get_drvdata(pdev);
+
+	return (rproc->resume) ? rproc->resume(rproc) : 0;
+}
+
+static int omap_rproc_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rproc *rproc = platform_get_drvdata(pdev);
+
+	return (rproc->suspend) ? rproc->suspend(rproc) : 0;
+}
+
+static int omap_rproc_idle(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rproc *rproc = platform_get_drvdata(pdev);
+
+	return (rproc->idle) ? rproc->idle(rproc) : 0;
+}
+
+static const struct dev_pm_ops rproc_pm_ops = {
+	.runtime_resume = omap_rproc_resume,
+	.runtime_suspend = omap_rproc_suspend,
+	.runtime_idle = omap_rproc_idle,
+};
+#endif
+
 static struct platform_driver omap_rproc_driver = {
 	.probe = omap_rproc_probe,
 	.remove = __devexit_p(omap_rproc_remove),
 	.driver = {
 		.name = "omap-rproc",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+		.pm = &rproc_pm_ops,
+#endif
 	},
 };
 
