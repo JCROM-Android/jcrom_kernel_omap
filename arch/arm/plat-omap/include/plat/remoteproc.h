@@ -37,6 +37,12 @@ struct omap_rproc_pdata {
 	const char *firmware;
 	const struct rproc_ops *ops;
 	const struct rproc_mem_entry *memory_maps;
+	u32 idle_addr;
+	u32 idle_mask;
+	u32 suspend_addr;
+	u32 suspend_mask;
+	unsigned sus_timeout;
+	char *sus_mbox_name;
 };
 
 #endif /* _PLAT_REMOTEPROC_H */

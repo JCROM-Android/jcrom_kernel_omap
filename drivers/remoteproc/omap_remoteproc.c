@@ -21,15 +21,67 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/remoteproc.h>
+#include <linux/sched.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/iommu.h>
 #include <plat/omap_device.h>
 #include <plat/remoteproc.h>
+#include <plat/mailbox.h>
+
+#define PM_SUSPEND_MBOX		0xffffff07
+#define PM_SUSPEND_TIMEOUT	300
 
 struct omap_rproc_priv {
 	struct iommu *iommu;
 	int (*iommu_cb)(struct rproc *, u64, u32);
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	struct omap_mbox *mbox;
+	void __iomem *idle;
+	u32 idle_mask;
+	void __iomem *suspend;
+	u32 suspend_mask;
+#endif
 };
+
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+static bool _may_suspend(struct rproc *rproc)
+{
+	struct omap_rproc_priv *rpp = rproc->priv;
+
+	return readl(rpp->idle) & rpp->idle_mask;
+}
+
+/*
+ * We don't take in account anything and send the suspend
+ * request to the remote processor. Remote processor needs to
+ * attend it inmmeaditely and suspend an error returned by
+ * this function means serious error in remote processor
+ */
+static int _suspend(struct rproc *rproc)
+{
+	struct omap_rproc_priv *rpp = rproc->priv;
+	unsigned long timeout = PM_SUSPEND_TIMEOUT + jiffies;
+
+	omap_mbox_msg_send(rpp->mbox, PM_SUSPEND_MBOX);
+
+	while (time_after(timeout, jiffies)) {
+		if (readl(rpp->suspend) & rpp->suspend_mask)
+			return 0;
+		schedule();
+	}
+
+	return -EFAULT;
+}
+
+static int omap_suspend(struct rproc *rproc, bool force)
+{
+	if (force || _may_suspend(rproc))
+		return _suspend(rproc);
+
+	return -EBUSY;
+}
+#endif
 
 static int
 omap_rproc_map(struct device *dev, struct iommu *obj, u32 da, u32 pa, u32 size)
@@ -133,6 +185,19 @@ err_mmu:
 static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 {
 	struct platform_device *pdev = to_platform_device(rproc->dev);
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	struct omap_rproc_pdata *pdata = rproc->dev->platform_data;
+	struct omap_rproc_priv *rpp = rproc->priv;
+
+	rpp->mbox = omap_mbox_get(pdata->sus_mbox_name, NULL);
+	if (IS_ERR(rpp->mbox))
+		return PTR_ERR(rpp->mbox);
+
+	rpp->idle = ioremap(pdata->idle_addr, sizeof(u32));
+	rpp->suspend = ioremap(pdata->suspend_addr, sizeof(u32));
+	rpp->idle_mask = pdata->idle_mask;
+	rpp->suspend_mask = pdata->suspend_mask;
+#endif
 
 	return omap_device_enable(pdev);
 }
@@ -150,13 +215,23 @@ static int omap_rproc_iommu_exit(struct rproc *rproc)
 static inline int omap_rproc_stop(struct rproc *rproc)
 {
 	struct platform_device *pdev = to_platform_device(rproc->dev);
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	struct omap_rproc_priv *rpp = rproc->priv;
 
-	return omap_device_shutdown(pdev);
+	omap_mbox_put(rpp->mbox, NULL);
+	iounmap(rpp->idle);
+	iounmap(rpp->suspend);
+#endif
+
+	return omap_device_idle(pdev);
 }
 
 static struct rproc_ops omap_rproc_ops = {
 	.start = omap_rproc_start,
 	.stop = omap_rproc_stop,
+#ifdef CONFIG_OMAP_REMOTE_PROC_AUTOSUSPEND
+	.suspend = omap_suspend,
+#endif
 	.iommu_init = omap_rproc_iommu_init,
 	.iommu_exit = omap_rproc_iommu_exit,
 };
@@ -167,7 +242,7 @@ static int omap_rproc_probe(struct platform_device *pdev)
 
 	return rproc_register(&pdev->dev, pdata->name, &omap_rproc_ops,
 				pdata->firmware, pdata->memory_maps,
-				THIS_MODULE);
+				THIS_MODULE, pdata->sus_timeout);
 }
 
 static int __devexit omap_rproc_remove(struct platform_device *pdev)
@@ -183,6 +258,7 @@ static struct platform_driver omap_rproc_driver = {
 	.driver = {
 		.name = "omap-rproc",
 		.owner = THIS_MODULE,
+		.pm = GENERIC_RPROC_PM_OPS,
 	},
 };
 
