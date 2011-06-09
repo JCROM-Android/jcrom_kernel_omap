@@ -26,6 +26,14 @@ config OMAP_REMOTE_PROC
 	  It's safe to say n here if you're not interested in multimedia
 	  offloading or just want a bare minium kernel.
 
+config OMAP_REMOTE_PROC_AUTOSUSPEND
+	bool "Autosuspend support for remoteproc"
+	depends on REMOTE_PROC
+	default y
+	help
+          Say Y here if you want remote processor to suspend
+          after some time of inactivity.
+
 config OMAP_RPRES
 	bool "Remote Processor Resources"
 	depends on OMAP_REMOTE_PROC
