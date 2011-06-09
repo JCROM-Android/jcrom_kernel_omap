@@ -1,0 +1,8 @@
+Change-Id: I33c1851bef34e0b30c31d8aeb48b449403625dad
+Verified+1: Dmitry Shmidt <dimitrysh%android.com@gtempaccount.com>
+Code-Review+2: Colin Cross <ccross@android.com>
+Submitted-by: Dmitry Shmidt <dimitrysh%android.com@gtempaccount.com>
+Submitted-at: Thu, 09 Jun 2011 13:56:06 -0700
+Reviewed-on: https://review.source.android.com/23610
+Project: kernel/omap
+Branch: refs/heads/android-omap-2.6.39
