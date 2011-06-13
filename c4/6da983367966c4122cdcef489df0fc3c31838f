@@ -1,0 +1,8 @@
+Change-Id: Ic46da983367966c4122cdcef489df0fc3c31838f
+Code-Review+2: Erik Gilling <konkers@android.com>
+Verified+1: Erik Gilling <konkers@android.com>
+Submitted-by: Erik Gilling <konkers@android.com>
+Submitted-at: Mon, 13 Jun 2011 16:27:54 -0700
+Reviewed-on: https://review.source.android.com/23716
+Project: kernel/omap
+Branch: refs/heads/linux-omap-dss-3.0
