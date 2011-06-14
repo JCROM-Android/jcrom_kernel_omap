@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/i2c/twl.h>
+#include <linux/switch.h>
 #include <linux/mfd/twl6040-codec.h>
 
 #include <sound/core.h>
@@ -74,6 +75,7 @@ struct twl6040_output {
 struct twl6040_jack_data {
 	struct snd_soc_jack *jack;
 	int report;
+	struct switch_dev sdev;
 };
 
 /* codec private data */
@@ -714,18 +716,21 @@ static void twl6040_hs_jack_report(struct snd_soc_codec *codec,
 				   struct snd_soc_jack *jack, int report)
 {
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
-	int status;
+	int status, state;
 
 	mutex_lock(&priv->mutex);
 
 	/* Sync status */
 	status = twl6040_read_reg_volatile(codec, TWL6040_REG_STATUS);
 	if (status & TWL6040_PLUGCOMP)
-		snd_soc_jack_report(jack, report, report);
+		state = report;
 	else
-		snd_soc_jack_report(jack, 0, report);
+		state = 0;
 
 	mutex_unlock(&priv->mutex);
+
+	snd_soc_jack_report(jack, state, report);
+	switch_set_state(&priv->hs_jack.sdev, !!state);
 }
 
 void twl6040_hs_jack_detect(struct snd_soc_codec *codec,
@@ -1525,6 +1530,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 {
 	struct twl6040_data *priv;
 	struct twl4030_codec_audio_data *pdata = dev_get_platdata(codec->dev);
+	struct twl6040_jack_data *jack;
 	int ret = 0;
 
 	priv = kzalloc(sizeof(struct twl6040_data), GFP_KERNEL);
@@ -1582,6 +1588,15 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	INIT_DELAYED_WORK(&priv->hs_delayed_work, twl6040_pga_hs_work);
 	INIT_DELAYED_WORK(&priv->hf_delayed_work, twl6040_pga_hf_work);
 
+	/* switch-class based headset detection */
+	jack = &priv->hs_jack;
+	jack->sdev.name = "h2w";
+	ret = switch_dev_register(&jack->sdev);
+	if (ret) {
+		dev_err(codec->dev, "error registering switch device %d\n", ret);
+		goto reg_err;
+	}
+
 	ret = twl6040_request_irq(codec->control_data, TWL6040_IRQ_PLUG,
 				  twl6040_audio_handler, "twl6040_irq_plug",
 				  codec);
@@ -1607,6 +1622,8 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 bias_err:
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_PLUG, codec);
 irq_err:
+	switch_dev_unregister(&jack->sdev);
+reg_err:
 	destroy_workqueue(priv->hs_workqueue);
 hswork_err:
 	destroy_workqueue(priv->hf_workqueue);
@@ -1620,9 +1637,11 @@ work_err:
 static int twl6040_remove(struct snd_soc_codec *codec)
 {
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	struct twl6040_jack_data *jack = &priv->hs_jack;
 
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_PLUG, codec);
+	switch_dev_unregister(&jack->sdev);
 	destroy_workqueue(priv->workqueue);
 	destroy_workqueue(priv->hf_workqueue);
 	destroy_workqueue(priv->hs_workqueue);
