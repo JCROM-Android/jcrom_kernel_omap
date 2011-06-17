@@ -7,6 +7,7 @@ menuconfig TI_TILER
 	tristate "TI TILER support"
 	default y
         depends on HAVE_TI_TILER
+	select ARM_HAS_SG_CHAIN
 	help
            TILER and TILER-DMM driver for TI chips.  The TI TILER device
            enables video rotation on certain TI chips such as OMAP4 or
