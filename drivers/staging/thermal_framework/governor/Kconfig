@@ -1,0 +1,11 @@
+#
+# Thermal governor driver config
+#
+
+config OMAP_DIE_GOVERNOR
+	bool "OMAP On Die thermal governor support"
+	depends on THERMAL_FRAMEWORK && OMAP_THERMAL
+	help
+	  Enabling this config will give support for the on-die
+	  temp sensor for the OMAP platform.  This is the governor which
+	  will institute the policy to call specific cooling devices
