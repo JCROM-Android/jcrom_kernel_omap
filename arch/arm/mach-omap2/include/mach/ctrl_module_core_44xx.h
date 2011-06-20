@@ -270,6 +270,40 @@
 #define OMAP4_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
 #define OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK		(0xff << 0)
 
+/* BANDGAP_CTRL */
+#define OMAP4_SINGLE_MODE_SHIFT					31
+#define OMAP4_SINGLE_MODE_MASK					(1 << 31)
+#define OMAP4_MASK_HOT_SHIFT					1
+#define OMAP4_MASK_HOT_MASK					(1 << 1)
+#define OMAP4_MASK_COLD_SHIFT					0
+#define OMAP4_MASK_COLD_MASK					(1 << 0)
+
+/* BANDGAP_COUNTER */
+#define OMAP4_COUNTER_SHIFT					0
+#define OMAP4_COUNTER_MASK					(0xffffff << 0)
+
+/* BANDGAP_THRESHOLD */
+#define OMAP4_T_HOT_SHIFT					16
+#define OMAP4_T_HOT_MASK					(0x3ff << 16)
+#define OMAP4_T_COLD_SHIFT					0
+#define OMAP4_T_COLD_MASK					(0x3ff << 0)
+
+/* TSHUT_THRESHOLD */
+#define OMAP4_TSHUT_HOT_SHIFT					16
+#define OMAP4_TSHUT_HOT_MASK					(0x3ff << 16)
+#define OMAP4_TSHUT_COLD_SHIFT					0
+#define OMAP4_TSHUT_COLD_MASK					(0x3ff << 0)
+
+/* BANDGAP_STATUS */
+#define OMAP4_CLEAN_STOP_SHIFT					3
+#define OMAP4_CLEAN_STOP_MASK					(1 << 3)
+#define OMAP4_BGAP_ALERT_SHIFT					2
+#define OMAP4_BGAP_ALERT_MASK					(1 << 2)
+#define OMAP4_HOT_FLAG_SHIFT					1
+#define OMAP4_HOT_FLAG_MASK					(1 << 1)
+#define OMAP4_COLD_FLAG_SHIFT					0
+#define OMAP4_COLD_FLAG_MASK					(1 << 0)
+
 /* DPLL_NWELL_TRIM_0 */
 #define OMAP4_DPLL_ABE_NWELL_TRIM_MUX_CTRL_SHIFT	29
 #define OMAP4_DPLL_ABE_NWELL_TRIM_MUX_CTRL_MASK		(1 << 29)
