@@ -37,6 +37,13 @@
 
 #include <mach/tiler.h>
 
+#ifdef CONFIG_ION_OMAP
+#include <linux/ion.h>
+#include <linux/omap_ion.h>
+
+extern struct ion_device *omap_ion_device;
+#endif
+
 /* maximum OMX devices this driver can handle */
 #define MAX_OMX_DEVICES		8
 
@@ -52,6 +59,10 @@ struct rpmsg_omx_service {
 	struct device *dev;
 	struct rpmsg_channel *rpdev;
 	int minor;
+#ifdef CONFIG_ION_OMAP
+	struct ion_client *ion_client;
+#endif
+
 };
 
 struct rpmsg_omx_instance {
@@ -63,6 +74,9 @@ struct rpmsg_omx_instance {
 	struct rpmsg_endpoint *ept;
 	u32 dst;
 	int state;
+#ifdef CONFIG_ION_OMAP
+	struct ion_client *ion_client;
+#endif
 };
 
 /* the packet structure (actual message sent to omx service) */
@@ -84,12 +98,18 @@ static dev_t rpmsg_omx_dev;
 static DEFINE_IDR(rpmsg_omx_services);
 static DEFINE_SPINLOCK(rpmsg_omx_services_lock);
 
-static int _rpmsg_omx_map_buf(char *packet)
+static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 {
 	int ret = -1, offset = 0;
 	long *buffer;
 	char *data;
 	enum rpc_omx_map_info_type maptype;
+#ifdef CONFIG_ION_OMAP
+	struct ion_handle *handle;
+	ion_phys_addr_t paddr;
+	size_t unused;
+#endif
+
 	u32 pa = 0;
 
 	data = (char *)((struct omx_packet *)packet)->data;
@@ -105,16 +125,35 @@ static int _rpmsg_omx_map_buf(char *packet)
 	offset = *(int *)((int)data + sizeof(maptype));
 	buffer = (long *)((int)data + offset);
 
-	pa = tiler_virt2phys(*buffer);
+#ifdef CONFIG_ION_OMAP
+	handle = *buffer;
+	/* if this returned an error, assume you weren't passed an ion handle */
+	ret = ion_phys(omx->ion_client, handle, &paddr, &unused);
+	if (!ret)
+		pa = paddr;
+	else
+#endif
+		pa = tiler_virt2phys(*buffer);
+
 	if (pa) {
 		*buffer = pa;
 		ret = 0;
 	}
 
 	if (!ret && maptype == RPC_OMX_MAP_INFO_TWO_BUF) {
+		printk("%s %d:map 2 buf\n", __func__, __LINE__);
 		buffer = (long *)((int)data + offset + sizeof(*buffer));
 		ret = -1;
-		pa = tiler_virt2phys(*buffer);
+
+#ifdef CONFIG_ION_OMAP
+		handle = *buffer;
+		ret = ion_phys(omx->ion_client, handle, &paddr, &unused);
+		/* if this returned an error, assume you weren't passed an ion handle */
+		if (ret)
+			pa = paddr;
+		else
+#endif
+			pa = tiler_virt2phys(*buffer);
 		if (pa) {
 			*buffer = pa;
 			ret = 0;
@@ -255,6 +294,30 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		buf[sizeof(buf) - 1] = '\0';
 		ret = rpmsg_omx_connect(omx, buf);
 		break;
+#ifdef CONFIG_ION_OMAP
+	case OMX_IOCIONREGISTER:
+	{
+		struct ion_fd_data data;
+		if (copy_from_user(&data, (char __user *) arg, sizeof(data)))
+			return -EFAULT;
+		data.handle = ion_import_fd(omx->ion_client, data.fd);
+		if (IS_ERR(data.handle))
+			data.handle = NULL;
+		if (copy_to_user(&data, (char __user *) arg, sizeof(data)))
+			return -EFAULT;
+		break;
+	}
+	case OMX_IOCIONUNREGISTER:
+	{
+		struct ion_fd_data data;
+		if (copy_from_user(&data, (char __user *) arg, sizeof(data)))
+			return -EFAULT;
+		ion_free(omx->ion_client, data.handle);
+		if (copy_to_user(&data, (char __user *) arg, sizeof(data)))
+			return -EFAULT;
+		break;
+	}
+#endif
 	default:
 		dev_warn(omxserv->dev, "unhandled ioctl cmd: %d\n", cmd);
 		break;
@@ -288,6 +351,12 @@ static int rpmsg_omx_open(struct inode *inode, struct file *filp)
 		kfree(omx);
 		return -ENOMEM;
 	}
+#ifdef CONFIG_ION_OMAP
+	omx->ion_client = ion_client_create(omap_ion_device,
+					    (1<< ION_HEAP_TYPE_CARVEOUT) |
+					    (1 << OMAP_ION_HEAP_TYPE_TILER),
+					    "rpmsg-omx");
+#endif
 
 	/* associate filp with the new omx instance */
 	filp->private_data = omx;
@@ -326,6 +395,9 @@ static int rpmsg_omx_release(struct inode *inode, struct file *filp)
 		return ret;
 	}
 
+#ifdef CONFIG_ION_OMAP
+	ion_client_destroy(omx->ion_client);
+#endif
 	rpmsg_destroy_ept(omx->ept);
 	kfree(omx);
 
@@ -401,7 +473,7 @@ static ssize_t rpmsg_omx_write(struct file *filp, const char __user *ubuf,
 	if (copy_from_user(hdr->data, ubuf, use))
 		return -EMSGSIZE;
 
-	if (_rpmsg_omx_map_buf(hdr->data))
+	if (_rpmsg_omx_map_buf(omx, hdr->data))
 		return -EFAULT;
 
 	hdr->type = OMX_RAW_MSG;
