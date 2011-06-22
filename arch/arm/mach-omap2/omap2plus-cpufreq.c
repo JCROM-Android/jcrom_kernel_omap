@@ -27,6 +27,7 @@
 #include <linux/io.h>
 #include <linux/opp.h>
 #include <linux/cpu.h>
+#include <linux/thermal_framework.h>
 
 #include <asm/system.h>
 #include <asm/smp_plat.h>
@@ -46,10 +47,125 @@ static struct clk *mpu_clk;
 static char *mpu_clk_name;
 static struct device *mpu_dev;
 
+
+#ifdef CONFIG_OMAP_THERMAL
+static unsigned int max_thermal;
+
+/*
+ * cpufreq_apply_cooling: based on requested cooling level, throttle the cpu
+ * @param cooling_level: percentage of required cooling at the moment
+ *
+ * The maximum cpu frequency will be readjusted based on the required
+ * cooling_level.
+ * TODO: Make it cpu independent
+ */
+static int cpufreq_apply_cooling(struct thermal_dev *dev,
+					int cooling_level)
+{
+	struct cpufreq_policy policy;
+	unsigned int max;
+	int i;
+
+	if (cooling_level > 100) {
+		pr_err("%s:Cooling level requested is out of range\n",
+			__func__);
+		return -ERANGE;
+	}
+	if (!freq_table) {
+		pr_err("%s:Frequency table is NULL\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	cpufreq_get_policy(&policy, 0);
+	max = (policy.cpuinfo.max_freq - policy.cpuinfo.min_freq) *
+			(100 - cooling_level) / 100;
+	max += policy.cpuinfo.min_freq;
+
+	/*
+	 * This procedure is to find a upper limit based on the requested
+	 * cooling level.
+	 * First do a walk in the list to find the first freq that satisfies
+	 * the requested cooling level.
+	 */
+	i = 0;
+	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
+		if (freq_table[i].frequency >= max)
+			break;
+		i++;
+	}
+	/* If none has been found do our best. Cross your fingers or pray. */
+	if (freq_table[i].frequency == CPUFREQ_TABLE_END) {
+		if (i > 0)
+			i--;
+	}
+
+	max_thermal = freq_table[i].frequency;
+
+	dev_dbg(mpu_dev, "%s: thermal request to %d level."
+			" Adjusting max frequency to %u "
+			"(Computed %u ).\n", __func__,
+			cooling_level, max_thermal, max);
+
+	cpufreq_update_policy(0);
+
+	return 0;
+}
+
+static void omap_cpufreq_cooling_verify_limit(struct cpufreq_policy *policy)
+{
+	if (policy->max > max_thermal) {
+		policy->max = max_thermal;
+		policy->user_policy.max = max_thermal;
+	}
+}
+
+static struct thermal_dev_ops cpufreq_cooling_ops = {
+	.cool_device = cpufreq_apply_cooling,
+};
+
+static struct thermal_dev thermal_dev = {
+	.name		= "cpufreq_cooling",
+	.domain_name	= "cpu",
+	.dev_ops	= &cpufreq_cooling_ops,
+};
+
+static int __init omap_cpufreq_cooling_init(void)
+{
+	int i;
+	int ret;
+
+	ret = thermal_cooling_dev_register(&thermal_dev);
+	if (ret)
+		return ret;
+
+	i = 0;
+	while (freq_table[i].frequency != CPUFREQ_TABLE_END)
+		i++;
+
+	if (i > 0)
+		i--;
+
+	max_thermal = freq_table[i].frequency;
+
+	return ret;
+}
+
+static void __exit omap_cpufreq_cooling_exit(void)
+{
+	thermal_governor_dev_unregister(&thermal_dev);
+}
+#else
+static void omap_cpufreq_cooling_verify_limit(struct cpufreq_policy *policy) { }
+static int __init omap_cpufreq_cooling_init(void) { return 0; }
+static void __exit omap_cpufreq_cooling_exit(void) { return 0; }
+#endif
+
 static int omap_verify_speed(struct cpufreq_policy *policy)
 {
 	if (!freq_table)
 		return -EINVAL;
+	omap_cpufreq_cooling_verify_limit(policy);
 	return cpufreq_frequency_table_verify(policy, freq_table);
 }
 
@@ -192,6 +308,10 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	policy->max = policy->cpuinfo.max_freq;
 	policy->cur = omap_getspeed(policy->cpu);
 
+	result = omap_cpufreq_cooling_init();
+	if (result)
+		goto fail_table;
+
 	/*
 	 * On OMAP SMP configuartion, both processors share the voltage
 	 * and clock. So both CPUs needs to be scaled together and hence
@@ -267,6 +387,7 @@ static int __init omap_cpufreq_init(void)
 static void __exit omap_cpufreq_exit(void)
 {
 	cpufreq_unregister_driver(&omap_driver);
+	omap_cpufreq_cooling_exit();
 }
 
 MODULE_DESCRIPTION("cpufreq driver for OMAP2PLUS SOCs");
