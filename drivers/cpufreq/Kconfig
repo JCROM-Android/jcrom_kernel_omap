@@ -33,6 +33,23 @@ config CPU_FREQ_STAT
 
 	  If in doubt, say N.
 
+config CPU_FREQ_COOLING
+	tristate "Use CPU frequency as a cooling device for CPUs"
+	select CPU_FREQ_TABLE
+	depends on THERMAL_FRAMEWORK
+	default y
+	help
+	  This module exports a cooling device to be used by thermal managers.
+	  The idea is to cool CPU thermal zone by reducing the used CPU
+	  frequency as a cooling strategy. The requirement is that when platform
+	  code initializes the CPU frequencies, it must also inform the expected
+	  cooling effect (cooling_level) on each CPU frequency available.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_cooling_freq.
+
+	  If in doubt, say N.
+
 config CPU_FREQ_STAT_DETAILS
 	bool "CPU frequency translation statistics details"
 	depends on CPU_FREQ_STAT

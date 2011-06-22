@@ -375,6 +375,7 @@ struct cpufreq_frequency_table {
 	unsigned int	index;     /* any */
 	unsigned int	frequency; /* kHz - doesn't need to be in ascending
 				    * order */
+	unsigned int	cooling_level;
 };
 
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
