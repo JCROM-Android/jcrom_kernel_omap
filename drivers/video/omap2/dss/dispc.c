@@ -38,6 +38,7 @@
 
 #include <plat/sram.h>
 #include <plat/clock.h>
+#include <mach/tiler.h>
 
 #include <video/omapdss.h>
 
@@ -102,7 +103,7 @@ static struct {
 	int irq;
 	struct clk *dss_clk;
 
-	u32	fifo_size[3];
+	u32	fifo_size[MAX_DSS_OVERLAYS];
 
 	u32	channel_irq[3]; /* Max channels hardcoded to 3*/
 
@@ -864,11 +865,24 @@ static void _dispc_setup_color_conv_coef(void)
 	dispc_write_reg(DISPC_OVL_CONV_COEF(OMAP_DSS_VIDEO2, 4),
 		CVAL(0, ct->bcb));
 
+	dispc_write_reg(DISPC_OVL_CONV_COEF(OMAP_DSS_VIDEO3, 0),
+		CVAL(ct->rcr, ct->ry));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(OMAP_DSS_VIDEO3, 1),
+		CVAL(ct->gy, ct->rcb));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(OMAP_DSS_VIDEO3, 2),
+		CVAL(ct->gcb, ct->gcr));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(OMAP_DSS_VIDEO3, 3),
+		CVAL(ct->bcr, ct->by));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(OMAP_DSS_VIDEO3, 4),
+		CVAL(0, ct->bcb));
+
 #undef CVAL
 
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_VIDEO1),
 		ct->full_range, 11, 11);
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_VIDEO2),
+		ct->full_range, 11, 11);
+	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_VIDEO3),
 		ct->full_range, 11, 11);
 }
 
@@ -944,8 +958,12 @@ static void _dispc_setup_global_alpha(enum omap_plane plane, u8 global_alpha)
 
 	if (plane == OMAP_DSS_GFX)
 		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 7, 0);
+	else if (plane == OMAP_DSS_VIDEO1)
+		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 15, 8);
 	else if (plane == OMAP_DSS_VIDEO2)
 		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 23, 16);
+	else if (plane == OMAP_DSS_VIDEO3)
+		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 31, 24);
 }
 
 static void _dispc_set_pix_inc(enum omap_plane plane, s32 inc)
@@ -1052,6 +1070,7 @@ void dispc_set_channel_out(enum omap_plane plane,
 		break;
 	case OMAP_DSS_VIDEO1:
 	case OMAP_DSS_VIDEO2:
+	case OMAP_DSS_VIDEO3:
 		shift = 16;
 		break;
 	default:
@@ -1098,6 +1117,7 @@ void dispc_set_burst_size(enum omap_plane plane,
 		break;
 	case OMAP_DSS_VIDEO1:
 	case OMAP_DSS_VIDEO2:
+	case OMAP_DSS_VIDEO3:
 		shift = 14;
 		break;
 	default:
@@ -1122,6 +1142,29 @@ void dispc_enable_gamma_table(bool enable)
 	}
 
 	REG_FLD_MOD(DISPC_CONFIG, enable, 9, 9);
+}
+
+void dispc_set_zorder(enum omap_plane plane,
+			enum omap_overlay_zorder zorder)
+{
+	u32 val;
+
+	if (!dss_has_feature(FEAT_OVL_ZORDER))
+		return;
+	val = dispc_read_reg(DISPC_OVL_ATTRIBUTES(plane));
+	val = FLD_MOD(val, zorder, 27, 26);
+	dispc_write_reg(DISPC_OVL_ATTRIBUTES(plane), val);
+}
+
+void dispc_enable_zorder(enum omap_plane plane, bool enable)
+{
+	u32 val;
+
+	if (!dss_has_feature(FEAT_OVL_ZORDER))
+		return;
+	val = dispc_read_reg(DISPC_OVL_ATTRIBUTES(plane));
+	val = FLD_MOD(val, enable, 25, 25);
+	dispc_write_reg(DISPC_OVL_ATTRIBUTES(plane), val);
 }
 
 static void _dispc_set_vid_color_conv(enum omap_plane plane, bool enable)
@@ -1488,6 +1531,15 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	if (dss_has_feature(FEAT_ROWREPEATENABLE))
 		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane),
 			row_repeat ? 1 : 0, 18, 18);
+
+	if (color_mode == OMAP_DSS_COLOR_NV12) {
+		/* this will never happen for GFX */
+		/* 1D NV12 buffer is always non-rotated or vert. mirrored */
+		bool doublestride = (rotation == OMAP_DSS_ROT_0 ||
+				     rotation == OMAP_DSS_ROT_180);
+		/* DOUBLESTRIDE */
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), doublestride, 22, 22);
+	}
 }
 
 static int color_mode_to_bpp(enum omap_color_mode color_mode)
@@ -1534,6 +1586,26 @@ static s32 pixinc(int pixels, u8 ps)
 		return 1 - (-pixels + 1) * ps;
 	else
 		BUG();
+}
+
+static void calc_tiler_row_rotation(struct tiler_view_t *view,
+		s32 *row_inc, unsigned *offset1, bool ilace)
+{
+	/* assume TB. We worry about swapping top/bottom outside of this call */
+
+	if (ilace) {
+		/* even and odd frames are interleaved */
+
+		/* offset1 is always at an odd line */
+		*offset1 = view->v_inc;
+	}
+	*row_inc = view->v_inc + 1 - view->width * view->bpp;
+
+	DSSDBG(" ps: %d, width: %d, offset1: %d,"
+		" height: %d, row_inc:%d\n",
+		view->bpp, view->width, *offset1, view->height, *row_inc);
+
+	return;
 }
 
 static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
@@ -1949,16 +2021,61 @@ int dispc_setup_plane(enum omap_plane plane,
 	if (fieldmode)
 		field_offset = 1;
 
-	if (rotation_type == OMAP_DSS_ROT_DMA)
+	/* default values */
+	row_inc = pix_inc = 0x1;
+	offset0 = offset1 = 0x0;
+
+	/*
+	 * :HACK: we piggy back on UV separate feature for TILER to avoid
+	 * having to keep rebase our FEAT_ enum until they add TILER.
+	 */
+	if (dss_has_feature(FEAT_HANDLE_UV_SEPARATE)) {
+		/* set BURSTTYPE */
+		bool use_tiler = rotation_type == OMAP_DSS_ROT_TILER;
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), use_tiler, 29, 29);
+	}
+
+	if (rotation_type == OMAP_DSS_ROT_TILER) {
+		struct tiler_view_t view = {0};
+		unsigned long tiler_width = width, tiler_height = height;
+		/* tiler needs 0-degree width & height */
+		if (rotation & 1)
+			swap(tiler_width, tiler_height);
+
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+		    color_mode == OMAP_DSS_COLOR_UYVY)
+			tiler_width /= 2;
+
+		tilview_create(&view, paddr, tiler_width, tiler_height);
+		tilview_rotate(&view, rotation * 90);
+		tilview_flip(&view, mirror, false);
+		paddr = view.tsptr;
+
+		/* we cannot do TB field interlaced in rotated view */
+		calc_tiler_row_rotation(&view, &row_inc,
+				       &offset1, ilace);
+
+		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
+
+		if (puv_addr) {
+			tilview_create(&view, puv_addr, tiler_width / 2,
+					       tiler_height / 2);
+			tilview_rotate(&view, rotation * 90);
+			tilview_flip(&view, mirror, false);
+			puv_addr = view.tsptr;
+		}
+
+	} else if (rotation_type == OMAP_DSS_ROT_DMA) {
 		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
-	else
+	} else {
 		calc_vrfb_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
+	}
 
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
@@ -2135,6 +2252,8 @@ static void dispc_enable_digit_out(bool enable)
 		dispc.irq_error_mask = DISPC_IRQ_MASK_ERROR;
 		if (dss_has_feature(FEAT_MGR_LCD2))
 			dispc.irq_error_mask |= DISPC_IRQ_SYNC_LOST2;
+		if (dss_has_feature(FEAT_OVL_VID3))
+			dispc.irq_error_mask |= DISPC_IRQ_VID3_FIFO_UNDERFLOW;
 		dispc_write_reg(DISPC_IRQSTATUS, DISPC_IRQ_SYNC_LOST_DIGIT);
 		_omap_dispc_set_irqs();
 		spin_unlock_irqrestore(&dispc.irq_lock, flags);
@@ -2293,6 +2412,10 @@ void dispc_enable_alpha_blending(enum omap_channel ch, bool enable)
 	if (!dss_has_feature(FEAT_GLOBAL_ALPHA))
 		return;
 
+	/* compatibility mode is not supported on LCD2 */
+	if (ch == OMAP_DSS_CHANNEL_LCD2)
+		return;
+
 	if (ch == OMAP_DSS_CHANNEL_LCD)
 		REG_FLD_MOD(DISPC_CONFIG, enable, 18, 18);
 	else if (ch == OMAP_DSS_CHANNEL_DIGIT)
@@ -2312,7 +2435,7 @@ bool dispc_alpha_blending_enabled(enum omap_channel ch)
 	else if (ch == OMAP_DSS_CHANNEL_DIGIT)
 		enabled = REG_GET(DISPC_CONFIG, 19, 19);
 	else if (ch == OMAP_DSS_CHANNEL_LCD2)
-		enabled = REG_GET(DISPC_CONFIG2, 18, 18);
+		enabled = false;
 	else
 		BUG();
 
@@ -2678,6 +2801,10 @@ void dispc_dump_irqs(struct seq_file *s)
 	PIS(VID1_END_WIN);
 	PIS(VID2_FIFO_UNDERFLOW);
 	PIS(VID2_END_WIN);
+	if (dss_has_feature(FEAT_OVL_VID3)) {
+		PIS(VID3_FIFO_UNDERFLOW);
+		PIS(VID3_END_WIN);
+	}
 	PIS(SYNC_LOST);
 	PIS(SYNC_LOST_DIGIT);
 	PIS(WAKEUP);
@@ -2693,6 +2820,7 @@ void dispc_dump_irqs(struct seq_file *s)
 
 void dispc_dump_regs(struct seq_file *s)
 {
+	int i, o;
 #define DUMPREG(r) seq_printf(s, "%-50s %08x\n", #r, dispc_read_reg(r))
 
 	if (dispc_runtime_get())
@@ -3193,6 +3321,8 @@ static void print_irq_status(u32 status)
 	PIS(OCP_ERR);
 	PIS(VID1_FIFO_UNDERFLOW);
 	PIS(VID2_FIFO_UNDERFLOW);
+	if (dss_has_feature(FEAT_OVL_VID3))
+		PIS(VID3_FIFO_UNDERFLOW);
 	PIS(SYNC_LOST);
 	PIS(SYNC_LOST_DIGIT);
 	if (dss_has_feature(FEAT_MGR_LCD2))
@@ -3338,6 +3468,24 @@ static void dispc_error_worker(struct work_struct *work)
 				continue;
 
 			if (ovl->id == 2) {
+				dispc_enable_plane(ovl->id, 0);
+				dispc_go(ovl->manager->id);
+				mdelay(50);
+				break;
+			}
+		}
+	}
+
+	if (errors & DISPC_IRQ_VID3_FIFO_UNDERFLOW) {
+		DSSERR("VID3_FIFO_UNDERFLOW, disabling VID3\n");
+		for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+			struct omap_overlay *ovl;
+			ovl = omap_dss_get_overlay(i);
+
+			if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
+				continue;
+
+			if (ovl->id == 3) {
 				dispc_enable_plane(ovl->id, 0);
 				dispc_go(ovl->manager->id);
 				mdelay(50);
@@ -3572,7 +3720,8 @@ static void _omap_dispc_initialize_irq(void)
 	dispc.irq_error_mask = DISPC_IRQ_MASK_ERROR;
 	if (dss_has_feature(FEAT_MGR_LCD2))
 		dispc.irq_error_mask |= DISPC_IRQ_SYNC_LOST2;
-
+	if (dss_has_feature(FEAT_OVL_VID3))
+		dispc.irq_error_mask |= DISPC_IRQ_VID3_FIFO_UNDERFLOW;
 	/* there's SYNC_LOST_DIGIT waiting after enabling the DSS,
 	 * so clear it */
 	dispc_write_reg(DISPC_IRQSTATUS, dispc_read_reg(DISPC_IRQSTATUS));

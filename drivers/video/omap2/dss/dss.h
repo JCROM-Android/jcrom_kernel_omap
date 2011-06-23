@@ -398,6 +398,9 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high);
 void dispc_enable_fifomerge(bool enable);
 void dispc_set_burst_size(enum omap_plane plane,
 		enum omap_burst_size burst_size);
+void dispc_set_zorder(enum omap_plane plane,
+			enum omap_overlay_zorder zorder);
+void dispc_enable_zorder(enum omap_plane plane, bool enable);
 
 void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_ba1(enum omap_plane plane, u32 paddr);
@@ -534,5 +537,12 @@ static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)
 	}
 }
 #endif
+
+/* callback is optional */
+static inline void dss_ovl_cb(struct omapdss_ovl_cb *cb, int id, int status)
+{
+	if (cb->fn)
+		cb->fn(cb->data, id, status);
+}
 
 #endif

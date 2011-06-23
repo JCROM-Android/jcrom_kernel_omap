@@ -358,7 +358,7 @@ static int fb_mode_to_dss_mode(struct fb_var_screeninfo *var,
 		dssmode = OMAP_DSS_COLOR_RGB24P;
 		break;
 	case 32:
-		dssmode = OMAP_DSS_COLOR_RGB24U;
+		dssmode = OMAP_DSS_COLOR_ARGB32;
 		break;
 	default:
 		return -EINVAL;
@@ -992,8 +992,21 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 		if (r)
 			goto err;
 
-		if (!init && ovl->manager)
+		if (!init && ovl->manager) {
+			struct omap_dss_device *dev;
+			struct omap_dss_driver *drv;
+
 			ovl->manager->apply(ovl->manager);
+
+			drv = ovl->manager->device->driver;
+			dev = ovl->manager->device;
+
+			if (dev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+				drv->get_update_mode(dev) != OMAP_DSS_UPDATE_AUTO)
+				return drv->update(dev, 0, 0,
+							dev->panel.timings.x_res,
+							dev->panel.timings.y_res);
+		}
 	}
 	return 0;
 err:
