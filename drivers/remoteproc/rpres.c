@@ -75,6 +75,46 @@ void rpres_put(struct rpres *obj)
 }
 EXPORT_SYMBOL(rpres_put);
 
+int rpres_set_cstrs(struct rpres *obj, u32 type, long val)
+{
+	int ret;
+	struct rpres_platform_data *pdata = obj->pdev->dev.platform_data;
+	struct platform_device *pdev = obj->pdev;
+	char *cstr_name[] = {"scale", "latency", "bandwidth"};
+	int (*func)(struct platform_device *, long);
+
+	switch (type) {
+	case RPRES_SCALE:
+		func = pdata->ops->scale_dev;
+		break;
+	case RPRES_LAT:
+		func = pdata->ops->set_lat;
+		break;
+	case RPRES_BW:
+		func = pdata->ops->set_bw;
+		break;
+	default:
+		dev_err(&pdev->dev, "Invalid constraint\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&obj->lock);
+	if (obj->state == RPRES_INACTIVE) {
+		mutex_unlock(&obj->lock);
+		pr_err("%s: resource inactive\n", __func__);
+		return -EPERM;
+	}
+
+	dev_dbg(&pdev->dev, "Set %s constraint %ld\n", cstr_name[type], val);
+	ret = func(pdev, val);
+	if (ret)
+		dev_err(&pdev->dev, "Error %s constraint\n", cstr_name[type]);
+	mutex_unlock(&obj->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(rpres_set_cstrs);
+
 static int rpres_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
