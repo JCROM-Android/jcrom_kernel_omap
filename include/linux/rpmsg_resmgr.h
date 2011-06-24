@@ -33,7 +33,9 @@
 #ifndef _LINUX_RPMSG_RESMGR_H
 #define _LINUX_RPMSG_RESMGR_H
 
-#define MAX_NUM_SDMA_CHANNELS 16
+#define MAX_NUM_SDMA_CHANNELS	16
+#define NO_CSTRS		-1
+#define INIT_CSTRS		0
 
 enum {
 	RPRM_GPTIMER	= 0,
@@ -56,6 +58,14 @@ enum {
 	RPRM_REQ_ALLOC	= 1,
 	RPRM_REQ_FREE	= 2,
 	RPRM_DISCONNECT	= 3,
+	RPRM_REQ_CSTRS	= 4,
+	RPRM_REL_CSTRS	= 5,
+};
+
+enum {
+	RPRM_SCALE	= 0x1,
+	RPRM_LAT	= 0x2,
+	RPRM_BW		= 0x4,
 };
 
 struct rprm_request {
@@ -98,6 +108,13 @@ struct rprm_gpio {
 struct rprm_sdma {
 	u32 num_chs;
 	s32 channels[MAX_NUM_SDMA_CHANNELS];
+};
+
+struct rprm_constraints_data {
+	u32 mask;
+	long frequency;
+	long bandwidth;
+	long latency;
 };
 
 #endif /* _LINUX_RPMSG_RESMGR_H */
