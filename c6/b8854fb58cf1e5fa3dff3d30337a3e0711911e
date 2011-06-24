@@ -1,0 +1,8 @@
+Change-Id: Ic6b8854fb58cf1e5fa3dff3d30337a3e0711911e
+Code-Review+2: Dima Zavin <dima@android.com>
+Verified+1: Simon Wilson <simonwilson@google.com>
+Submitted-by: Simon Wilson <simonwilson@google.com>
+Submitted-at: Fri, 24 Jun 2011 11:54:08 -0700
+Reviewed-on: https://review.source.android.com/24102
+Project: kernel/omap
+Branch: refs/heads/linux-omap-3.0
