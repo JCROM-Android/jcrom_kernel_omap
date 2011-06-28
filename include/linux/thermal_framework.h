@@ -24,6 +24,11 @@ struct thermal_dev;
  * struct thermal_dev_ops  - Structure for device operation call backs
  * @get_temp: A temp sensor call back to get the current temperature.
  *		temp is reported in milli degrees.
+ * @set_temp_thresh: Update the temperature sensor thresholds.  This can be used
+ *		to allow the sensor to only report changes when the thresholds
+ *		have been crossed.
+ * @set_temp_report_rate: Update the rate at which the temperature sensor
+ *		reports the temperature change.
  * @cool_device: The cooling agent call back to process a list of cooling agents
  * @process_temp: The governors call back for processing a domain temperature
  *
@@ -31,10 +36,13 @@ struct thermal_dev;
 struct thermal_dev_ops {
 	/* Sensor call backs */
 	int (*get_temp) (struct thermal_dev *);
+	void (*set_temp_thresh) (struct thermal_dev *temp_sensor,
+			int min, int max);
 	/* Cooling agent call backs */
 	int (*cool_device) (struct thermal_dev *, int temp);
 	/* Governor call backs */
-	int (*process_temp) (struct list_head *cooling_list, int temp);
+	int (*process_temp) (struct list_head *cooling_list,
+			struct thermal_dev *temp_sensor, int temp);
 };
 
 /**
@@ -60,7 +68,8 @@ struct thermal_dev {
 
 };
 
-
+extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
+		int min, int max);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
 extern int thermal_cooling_set_level(struct list_head *cooling_list,
 		unsigned int level);
