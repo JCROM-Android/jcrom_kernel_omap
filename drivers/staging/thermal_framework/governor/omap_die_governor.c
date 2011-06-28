@@ -35,11 +35,12 @@
 #define OMAP_CPU_THRESHOLD_FATAL 123000
 #define HYSTERESIS_VALUE 2000
 #define NORMAL_TEMP_MONITORING_RATE 2000
-#define FAST_TEMP_MONITORING_RATE 500
+#define FAST_TEMP_MONITORING_RATE 1000
 
 struct omap_die_governor {
 	struct thermal_dev *temp_sensor;
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
+	int report_rate;
 	int panic_zone_reached;
 };
 
@@ -91,6 +92,29 @@ static LIST_HEAD(cooling_agents);
  * NO_ACTION: Means just that.  There was no action taken based on the current
  * temperature sent in.
 */
+/**
+ * omap_update_report_rate() - Updates the temperature sensor monitoring rate
+ *
+ * @new_rate: New measurement rate for the temp sensor
+ *
+ * No return
+ */
+static void omap_update_report_rate(struct thermal_dev *temp_sensor,
+				int new_rate)
+{
+	if (omap_gov->report_rate == -EOPNOTSUPP) {
+		pr_err("%s:Updating the report rate is not supported\n",
+			__func__);
+		return;
+	}
+
+	if (omap_gov->report_rate != new_rate) {
+		pr_err("%s: Setting report rate to %i\n",
+			__func__, new_rate);
+		omap_gov->report_rate =
+			thermal_update_temp_rate(temp_sensor, new_rate);
+	}
+}
 
 /**
  * omap_safe_zone() - THERMAL "Safe Zone" definition:
@@ -130,6 +154,8 @@ out:
 		list_del_init(&cooling_agents);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			35000, 84999);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			NORMAL_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
@@ -173,6 +199,8 @@ out:
 		list_del_init(&cooling_agents);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			85000, 99999);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			NORMAL_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
@@ -218,6 +246,8 @@ out:
 		list_del_init(&cooling_agents);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			100000, 109999);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			NORMAL_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
@@ -260,6 +290,8 @@ out:
 		list_del_init(&cooling_agents);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			110000, 120000);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			FAST_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
