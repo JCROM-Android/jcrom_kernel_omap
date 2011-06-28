@@ -117,7 +117,7 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 				/* TO DO: Probably want to pass in the sensor
 				 * to modify the min/max values */
 				governor_dev->dev_ops->process_temp(&thermal_cooling_list,
-					tdev->current_temp);
+					tdev, tdev->current_temp);
 				goto out;
 			} else {
 				pr_debug("%s:Gov did not have right function\n",
@@ -131,6 +131,37 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(thermal_sensor_set_temp);
+
+
+/**
+ * thermal_update_temp_thresholds() - Update the temperature reporting
+ *			thresholds on the temp sensor.
+ *
+ * @min: The minimum temperature that should trigger a temperature event.
+ * @max: The maximum temperature that should trigger a temperature event.
+ *
+ */
+int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
+			int min, int max)
+{
+
+	if (temp_sensor) {
+		if ((temp_sensor->dev_ops) &&
+		    (temp_sensor->dev_ops->set_temp_thresh)) {
+			pr_debug("%s: Setting new temp thresholds to %i & %i\n",
+				__func__, min, max);
+			temp_sensor->dev_ops->set_temp_thresh(temp_sensor,
+				min, max);
+			return 0;
+		} else
+			pr_err("%s:Updating temp thresholds is not supported\n",
+				__func__);
+	} else
+		pr_err("%s:Temp sensor pointer is NULL\n", __func__);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(thermal_update_temp_thresholds);
 
 /**
  * thermal_governor_dev_register() - Registration call for thermal domain governors
