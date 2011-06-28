@@ -38,6 +38,8 @@
 #define FAST_TEMP_MONITORING_RATE 500
 
 struct omap_die_governor {
+	struct thermal_dev *temp_sensor;
+	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int panic_zone_reached;
 };
 
@@ -126,6 +128,8 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 0);
 		list_del_init(&cooling_agents);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			35000, 84999);
 	}
 
 	return 0;
@@ -167,6 +171,8 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 25);
 		list_del_init(&cooling_agents);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			85000, 99999);
 	}
 
 	return 0;
@@ -210,6 +216,8 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 50);
 		list_del_init(&cooling_agents);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			100000, 109999);
 	}
 
 	return 0;
@@ -250,6 +258,8 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 99);
 		list_del_init(&cooling_agents);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			110000, 120000);
 	}
 
 	return 0;
@@ -323,9 +333,13 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 	}
 }
 
-static int omap_process_cpu_temp(struct list_head *cooling_list, int temp)
+static int omap_process_cpu_temp(struct list_head *cooling_list,
+				struct thermal_dev *temp_sensor,
+				int temp)
 {
 	pr_debug("%s: Received temp %i\n", __func__, temp);
+	omap_gov->temp_sensor = temp_sensor;
+
 	return omap_cpu_thermal_manager(cooling_list, temp);
 }
 
