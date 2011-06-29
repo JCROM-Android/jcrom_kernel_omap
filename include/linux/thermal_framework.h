@@ -28,7 +28,8 @@ struct thermal_dev;
  *		to allow the sensor to only report changes when the thresholds
  *		have been crossed.
  * @set_temp_report_rate: Update the rate at which the temperature sensor
- *		reports the temperature change.
+ *		reports the temperature change.  This API should return the
+*		current measurement rate that the sensor is measuring at.
  * @cool_device: The cooling agent call back to process a list of cooling agents
  * @process_temp: The governors call back for processing a domain temperature
  *
@@ -38,6 +39,7 @@ struct thermal_dev_ops {
 	int (*get_temp) (struct thermal_dev *);
 	void (*set_temp_thresh) (struct thermal_dev *temp_sensor,
 			int min, int max);
+	int (*set_temp_report_rate) (struct thermal_dev *, int rate);
 	/* Cooling agent call backs */
 	int (*cool_device) (struct thermal_dev *, int temp);
 	/* Governor call backs */
@@ -71,6 +73,7 @@ struct thermal_dev {
 extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
 		int min, int max);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
+extern int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate);
 extern int thermal_cooling_set_level(struct list_head *cooling_list,
 		unsigned int level);
 
