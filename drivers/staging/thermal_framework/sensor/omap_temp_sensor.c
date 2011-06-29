@@ -357,6 +357,29 @@ static void omap_set_temp_thresh(struct thermal_dev *tdev, int min, int max)
 	return;
 }
 
+static int omap_update_measure_rate(struct omap_temp_sensor *temp_sensor,
+					int rate)
+{
+	u32 reg_val;
+
+	rate = (rate * temp_sensor->clk_rate) / 1000;
+	reg_val = omap_temp_sensor_readl(temp_sensor, BGAP_COUNTER_OFFSET);
+
+	reg_val &= ~(OMAP4_COUNTER_MASK);
+	reg_val |= rate;
+	omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_COUNTER_OFFSET);
+
+	return rate;
+}
+
+static int omap_set_measuring_rate(struct thermal_dev *tdev, int rate)
+{
+	struct platform_device *pdev = to_platform_device(tdev->dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+
+	return omap_update_measure_rate(temp_sensor, rate);
+}
+
 /*
  * sysfs hook functions
  */
@@ -469,22 +492,16 @@ static ssize_t set_update_rate(struct device *dev,
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
-	u32 reg_val;
 	long val;
-
-	mutex_lock(&temp_sensor->sensor_mutex);
 
 	if (strict_strtol(buf, 10, &val)) {
 		count = -EINVAL;
 		goto out;
 	}
 
-	val = (val * temp_sensor->clk_rate) / 1000;
-	reg_val = omap_temp_sensor_readl(temp_sensor, BGAP_COUNTER_OFFSET);
+	mutex_lock(&temp_sensor->sensor_mutex);
 
-	reg_val &= ~(OMAP4_COUNTER_MASK);
-	reg_val |= val;
-	omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_COUNTER_OFFSET);
+	omap_update_measure_rate(temp_sensor, (int)val);
 
 out:
 	mutex_unlock(&temp_sensor->sensor_mutex);
@@ -865,6 +882,7 @@ out:
 
 static struct thermal_dev_ops omap_sensor_ops = {
 	.set_temp_thresh = omap_set_temp_thresh,
+	.set_temp_report_rate = omap_set_measuring_rate,
 };
 
 static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
