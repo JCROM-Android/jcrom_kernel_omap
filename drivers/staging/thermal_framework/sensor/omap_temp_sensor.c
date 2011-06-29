@@ -238,50 +238,16 @@ static void omap_enable_continuous_mode(struct omap_temp_sensor *temp_sensor,
 	omap_temp_sensor_writel(temp_sensor, val, BGAP_CTRL_OFFSET);
 }
 
-/*
- * sysfs hook functions
- */
-
-static ssize_t show_temp_max(struct device *dev,
-			struct device_attribute *devattr, char *buf)
+static void omap_set_maximum_temp(struct omap_temp_sensor *temp_sensor,
+					int max)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
-	int temp;
-
-	mutex_lock(&temp_sensor->sensor_mutex);
-
-	temp = omap_temp_sensor_readl(temp_sensor, BGAP_THRESHOLD_OFFSET);
-	temp = (temp & OMAP4_T_HOT_MASK) >> OMAP4_T_HOT_SHIFT;
-	temp = adc_to_temp_conversion(temp);
-
-	mutex_unlock(&temp_sensor->sensor_mutex);
-
-	return sprintf(buf, "%d\n", temp);
-}
-
-static ssize_t set_temp_max(struct device *dev,
-			    struct device_attribute *devattr,
-			    const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
-	long val;
 	u32 reg_val, t_cold, t_hot, temp;
 
-	if (strict_strtol(buf, 10, &val)) {
-		count = -EINVAL;
-		goto out;
-	}
-
-	t_hot = temp_to_adc_conversion(val);
+	t_hot = temp_to_adc_conversion(max);
 	if ((t_hot < OMAP_ADC_START_VALUE || t_hot > OMAP_ADC_END_VALUE)) {
 		pr_err("invalid range\n");
-		count = -EINVAL;
-		goto out;
+		return;
 	}
-
-	mutex_lock(&temp_sensor->sensor_mutex);
 
 	/* obtain the T cold value */
 	t_cold = omap_temp_sensor_readl(temp_sensor, BGAP_THRESHOLD_OFFSET);
@@ -289,8 +255,7 @@ static ssize_t set_temp_max(struct device *dev,
 
 	if (t_hot < t_cold) {
 		pr_err("Error! T_HOT value lesser than T_COLD\n");
-		count = -EINVAL;
-		goto out;
+		return;
 	}
 
 	/* write the new t_hot value */
@@ -324,55 +289,17 @@ static ssize_t set_temp_max(struct device *dev,
 		omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_CTRL_OFFSET);
 	}
 
-	/*
-	 * else no need to do anything since HW will immediately compare
-	 * the new threshold and generate interrupt accordingly
-	 */
-out:
-	mutex_unlock(&temp_sensor->sensor_mutex);
-	return count;
 }
 
-static ssize_t show_temp_max_hyst(struct device *dev,
-			struct device_attribute *devattr,
-			char *buf)
+static void omap_set_minimum_temp(struct omap_temp_sensor *temp_sensor,
+					int min)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
-	u32 temp;
-
-	mutex_lock(&temp_sensor->sensor_mutex);
-
-	temp = omap_temp_sensor_readl(temp_sensor, BGAP_THRESHOLD_OFFSET);
-	temp = (temp & OMAP4_T_COLD_MASK) >> OMAP4_T_COLD_SHIFT;
-	temp = adc_to_temp_conversion(temp);
-
-	mutex_unlock(&temp_sensor->sensor_mutex);
-
-	return sprintf(buf, "%d\n", temp);
-}
-
-static ssize_t set_temp_max_hyst(struct device *dev,
-				 struct device_attribute *devattr,
-				 const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 	u32 reg_val, t_hot, t_cold, temp;
-	long val;
 
-	mutex_lock(&temp_sensor->sensor_mutex);
-
-	if (strict_strtol(buf, 10, &val)) {
-		count = -EINVAL;
-		goto out;
-	}
-
-	t_cold = temp_to_adc_conversion(val);
+	t_cold = temp_to_adc_conversion(min);
 	if (t_cold < OMAP_ADC_START_VALUE || t_cold > OMAP_ADC_END_VALUE) {
 		pr_err("invalid range");
-		count = -EINVAL;
-		goto out;
+		return;
 	}
 
 	/* obtain the T HOT value */
@@ -381,8 +308,7 @@ static ssize_t set_temp_max_hyst(struct device *dev,
 
 	if (t_cold > t_hot) {
 		pr_err("Error! T_COLD value greater than T_HOT\n");
-		count = -EINVAL;
-		goto out;
+		return;
 	}
 
 	/* write the new t_cold value */
@@ -416,13 +342,96 @@ static ssize_t set_temp_max_hyst(struct device *dev,
 		omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_CTRL_OFFSET);
 	}
 
-	/*
-	 * else no need to do anything since HW will immediately compare
-	 * the new threshold and generate interrupt accordingly
-	 */
+	return;
+
+}
+
+static void omap_set_temp_thresh(struct thermal_dev *tdev, int min, int max)
+{
+	struct platform_device *pdev = to_platform_device(tdev->dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+
+	omap_set_maximum_temp(temp_sensor, max);
+	omap_set_minimum_temp(temp_sensor, min);
+
+	return;
+}
+
+/*
+ * sysfs hook functions
+ */
+
+static ssize_t show_temp_max(struct device *dev,
+			struct device_attribute *devattr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	int temp;
+
+	mutex_lock(&temp_sensor->sensor_mutex);
+
+	temp = omap_temp_sensor_readl(temp_sensor, BGAP_THRESHOLD_OFFSET);
+	temp = (temp & OMAP4_T_HOT_MASK) >> OMAP4_T_HOT_SHIFT;
+	temp = adc_to_temp_conversion(temp);
+
+	mutex_unlock(&temp_sensor->sensor_mutex);
+
+	return sprintf(buf, "%d\n", temp);
+}
+
+static ssize_t set_temp_max(struct device *dev,
+			    struct device_attribute *devattr,
+			    const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	long val;
+
+	if (strict_strtol(buf, 10, &val)) {
+		count = -EINVAL;
+		goto out;
+	}
+
+	omap_set_maximum_temp(temp_sensor, val);
 
 out:
+	return count;
+}
+
+static ssize_t show_temp_max_hyst(struct device *dev,
+			struct device_attribute *devattr,
+			char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	u32 temp;
+
+	mutex_lock(&temp_sensor->sensor_mutex);
+
+	temp = omap_temp_sensor_readl(temp_sensor, BGAP_THRESHOLD_OFFSET);
+	temp = (temp & OMAP4_T_COLD_MASK) >> OMAP4_T_COLD_SHIFT;
+	temp = adc_to_temp_conversion(temp);
+
 	mutex_unlock(&temp_sensor->sensor_mutex);
+
+	return sprintf(buf, "%d\n", temp);
+}
+
+static ssize_t set_temp_max_hyst(struct device *dev,
+				 struct device_attribute *devattr,
+				 const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	long val;
+
+	if (strict_strtol(buf, 10, &val))
+		return -EINVAL;
+
+	mutex_lock(&temp_sensor->sensor_mutex);
+	omap_set_minimum_temp(temp_sensor, val);
+	mutex_unlock(&temp_sensor->sensor_mutex);
+
 	return count;
 }
 
@@ -854,6 +863,10 @@ out:
 	return IRQ_HANDLED;
 }
 
+static struct thermal_dev_ops omap_sensor_ops = {
+	.set_temp_thresh = omap_set_temp_thresh,
+};
+
 static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 {
 	struct omap_temp_sensor_pdata *pdata = pdev->dev.platform_data;
@@ -919,6 +932,8 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	if (temp_sensor->therm_fw) {
 		temp_sensor->therm_fw->name = "omap_ondie_sensor";
 		temp_sensor->therm_fw->domain_name = "cpu";
+		temp_sensor->therm_fw->dev = temp_sensor->dev;
+		temp_sensor->therm_fw->dev_ops = &omap_sensor_ops;
 		thermal_sensor_dev_register(temp_sensor->therm_fw);
 	}
 
