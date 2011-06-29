@@ -164,6 +164,32 @@ int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
 EXPORT_SYMBOL_GPL(thermal_update_temp_thresholds);
 
 /**
+ * thermal_update_temp_rate() - Update the rate for the temp sensor to read and
+ *				report the temperature data.
+ *
+ * @rate: The rate to read and report the data to the governor.  Rate is defined
+ *	per the temperature sensor driver
+ *
+ * Return is the current rate set.
+ */
+int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate)
+{
+	int ret_rate = -EOPNOTSUPP;
+	if (temp_sensor) {
+		if ((temp_sensor->dev_ops) &&
+		    (temp_sensor->dev_ops->set_temp_report_rate)) {
+			pr_debug("%s: Setting new temp report rate to %i\n",
+				__func__, rate);
+			ret_rate = temp_sensor->dev_ops->set_temp_report_rate(temp_sensor, rate);
+		}
+	} else
+		pr_err("%s:Temp sensor pointer is NULL\n", __func__);
+
+	return ret_rate;
+}
+EXPORT_SYMBOL_GPL(thermal_update_temp_rate);
+
+/**
  * thermal_governor_dev_register() - Registration call for thermal domain governors
  *
  * @tdev: The thermal governor device structure.
