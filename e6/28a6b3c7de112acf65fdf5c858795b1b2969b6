@@ -1,0 +1,8 @@
+Change-Id: Ie628a6b3c7de112acf65fdf5c858795b1b2969b6
+Code-Review+2: Rebecca Schultz Zavin <rebecca@android.com>
+Verified+1: Rebecca Schultz Zavin <rebecca@android.com>
+Submitted-by: Rebecca Schultz Zavin <rebecca@android.com>
+Submitted-at: Thu, 30 Jun 2011 15:35:08 -0700
+Reviewed-on: https://review.source.android.com/24265
+Project: kernel/omap
+Branch: refs/heads/android-omap-3.0
