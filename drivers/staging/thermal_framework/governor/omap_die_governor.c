@@ -45,6 +45,8 @@
 #define OMAP_GRADIENT_CONST -16000
 
 struct omap_die_governor {
+	struct thermal_dev *temp_sensor;
+	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int panic_zone_reached;
 };
 
@@ -116,6 +118,25 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 	return sensor_temp + absolute_delta;
 }
 
+/*
+ * hotspot_temp_to_omap_sensor_temp() - Convert the temperature from
+ *		the OMAP hot spot temperature into the OMAP on-die temp sensor.
+ * 		This is useful to configure the thresholds at OMAP on-die
+ *		sensor level. This takes care of the existing temperature
+ *		gradient between the OMAP hot spot and the on-die temp sensor.
+ *
+ * @hot_spot_temp: Hot spot temperature to the be calculated to CPU on-die
+ *		temperature value.
+ *
+ * Returns the calculated cpu on-die temperature.
+ */
+
+static signed hotspot_temp_to_sensor_temp(int hot_spot_temp)
+{
+	return ((hot_spot_temp - OMAP_GRADIENT_CONST) * 1000) /
+			(1000 + OMAP_GRADIENT_SLOPE);
+}
+
 /**
  * omap_safe_zone() - THERMAL "Safe Zone" definition:
  *  - No constraint about Max CPU frequency
@@ -130,6 +151,8 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 static int omap_safe_zone(struct list_head *cooling_list, int cpu_temp)
 {
 	struct thermal_dev *cooling_dev;
+	int die_temp_upper = 0;
+	int die_temp_lower = 0;
 
 	pr_info("%s:Safe zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
@@ -152,6 +175,10 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 0);
 		list_del_init(&cooling_agents);
+		die_temp_lower = hotspot_temp_to_sensor_temp(cpu_temp);
+		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			(die_temp_lower - HYSTERESIS_VALUE), die_temp_upper);
 	}
 
 	return 0;
@@ -171,6 +198,8 @@ out:
 static int omap_monitor_zone(struct list_head *cooling_list, int cpu_temp)
 {
 	struct thermal_dev *cooling_dev;
+	int die_temp_upper = 0;
+	int die_temp_lower = 0;
 
 	pr_info("%s:Monitor zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
@@ -193,6 +222,11 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 50);
 		list_del_init(&cooling_agents);
+		die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
+		die_temp_upper =
+			hotspot_temp_to_sensor_temp(OMAP_CPU_THRESHOLD_FATAL);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			die_temp_lower, die_temp_upper);
 	}
 
 	return 0;
@@ -214,6 +248,8 @@ out:
 static int omap_alert_zone(struct list_head *cooling_list, int cpu_temp)
 {
 	struct thermal_dev *cooling_dev;
+	int die_temp_upper = 0;
+	int die_temp_lower = 0;
 
 	pr_info("%s:Alert zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
@@ -236,6 +272,10 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 50);
 		list_del_init(&cooling_agents);
+		die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
+		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			die_temp_lower, die_temp_upper);
 	}
 
 	return 0;
@@ -254,6 +294,8 @@ out:
 static int omap_panic_zone(struct list_head *cooling_list, int cpu_temp)
 {
 	struct thermal_dev *cooling_dev;
+	int die_temp_upper = 0;
+	int die_temp_lower = 0;
 
 	pr_info("%s:Panic zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
@@ -276,6 +318,10 @@ out:
 	} else {
 		thermal_cooling_set_level(&cooling_agents, 99);
 		list_del_init(&cooling_agents);
+		die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
+		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
+		thermal_update_temp_thresholds(omap_gov->temp_sensor,
+			die_temp_lower, die_temp_upper);
 	}
 
 	return 0;
@@ -336,9 +382,12 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 
 }
 
-static int omap_process_cpu_temp(struct list_head *cooling_list, int temp)
+static int omap_process_cpu_temp(struct list_head *cooling_list,
+				struct thermal_dev *temp_sensor,
+				int temp)
 {
 	pr_debug("%s: Received temp %i\n", __func__, temp);
+	omap_gov->temp_sensor = temp_sensor;
 	return omap_cpu_thermal_manager(cooling_list, temp);
 }
 
