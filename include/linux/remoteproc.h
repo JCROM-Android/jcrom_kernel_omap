@@ -35,6 +35,7 @@
 
 #include <linux/mutex.h>
 #include <linux/completion.h>
+#include <linux/pm_qos_params.h>
 
 /**
  * The following enums and structures define the binary format of the images
@@ -106,11 +107,20 @@ struct rproc_mem_entry {
 	u32 size;
 };
 
+enum rproc_constraint {
+	RPROC_CONSTRAINT_SCALE,
+	RPROC_CONSTRAINT_LATENCY,
+	RPROC_CONSTRAINT_BANDWIDTH,
+};
+
 struct rproc;
 
 struct rproc_ops {
 	int (*start)(struct rproc *rproc, u64 bootaddr);
 	int (*stop)(struct rproc *rproc);
+	int (*set_lat)(struct rproc *rproc, long v);
+	int (*set_bw)(struct rproc *rproc, long v);
+	int (*scale)(struct rproc *rproc, long v);
 };
 
 /*
@@ -175,6 +185,7 @@ struct rproc {
 	char *trace_buf0, *trace_buf1;
 	int trace_len0, trace_len1;
 	struct completion firmware_loading_complete;
+	struct pm_qos_request_list *qos_request;
 };
 
 struct rproc *rproc_get(const char *);
@@ -182,5 +193,6 @@ void rproc_put(struct rproc *);
 int rproc_register(struct device *, const char *, const struct rproc_ops *,
 		const char *, const struct rproc_mem_entry *, struct module *);
 int rproc_unregister(const char *);
+int rproc_set_constraints(struct rproc *, enum rproc_constraint type, long v);
 
 #endif /* REMOTEPROC_H */
