@@ -117,7 +117,7 @@ static void omap_update_report_rate(struct thermal_dev *temp_sensor,
 	}
 
 	if (omap_gov->report_rate != new_rate) {
-		pr_err("%s: Setting report rate to %i\n",
+		pr_debug("%s: Setting report rate to %i\n",
 			__func__, new_rate);
 		omap_gov->report_rate =
 			thermal_update_temp_rate(temp_sensor, new_rate);
@@ -179,7 +179,7 @@ static int omap_safe_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_info("%s:Safe zone\n", __func__);
+	pr_debug("%s:Safe zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry(cooling_dev, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -228,7 +228,7 @@ static int omap_monitor_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_info("%s:Monitor zone\n", __func__);
+	pr_debug("%s:Monitor zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry(cooling_dev, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -280,7 +280,7 @@ static int omap_alert_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_info("%s:Alert zone\n", __func__);
+	pr_debug("%s:Alert zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry(cooling_dev, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -328,7 +328,7 @@ static int omap_panic_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_info("%s:Panic zone\n", __func__);
+	pr_debug("%s:Panic zone\n", __func__);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry(cooling_dev, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -380,7 +380,7 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 	int cpu_temp;
 
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(temp);
-	pr_info("%s: triggered with these temp: temp %d cpu_temp %d\n",
+	pr_debug("%s: triggered with these temp: temp %d cpu_temp %d\n",
 						__func__, temp, cpu_temp);
 	if (cpu_temp >= OMAP_CPU_THRESHOLD_FATAL) {
 		omap_fatal_zone(cpu_temp);
