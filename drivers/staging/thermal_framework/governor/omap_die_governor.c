@@ -38,8 +38,8 @@
 /* TODO: Define this via a configurable file */
 #define OMAP_CPU_THRESHOLD_FATAL 123000
 #define HYSTERESIS_VALUE 2000
-#define NORMAL_TEMP_MONITORING_RATE 2000
-#define FAST_TEMP_MONITORING_RATE 500
+#define NORMAL_TEMP_MONITORING_RATE 1000
+#define FAST_TEMP_MONITORING_RATE 250
 
 #define OMAP_GRADIENT_SLOPE 376
 #define OMAP_GRADIENT_CONST -16000
@@ -47,6 +47,7 @@
 struct omap_die_governor {
 	struct thermal_dev *temp_sensor;
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
+	int report_rate;
 	int panic_zone_reached;
 };
 
@@ -98,6 +99,30 @@ static LIST_HEAD(cooling_agents);
  * NO_ACTION: Means just that.  There was no action taken based on the current
  * temperature sent in.
 */
+
+/**
+ * omap_update_report_rate() - Updates the temperature sensor monitoring rate
+ *
+ * @new_rate: New measurement rate for the temp sensor
+ *
+ * No return
+ */
+static void omap_update_report_rate(struct thermal_dev *temp_sensor,
+				int new_rate)
+{
+	if (omap_gov->report_rate == -EOPNOTSUPP) {
+		pr_err("%s:Updating the report rate is not supported\n",
+			__func__);
+		return;
+	}
+
+	if (omap_gov->report_rate != new_rate) {
+		pr_err("%s: Setting report rate to %i\n",
+			__func__, new_rate);
+		omap_gov->report_rate =
+			thermal_update_temp_rate(temp_sensor, new_rate);
+	}
+}
 
 /*
  * convert_omap_sensor_temp_to_hotspot_temp() -Convert the temperature from the
@@ -179,6 +204,8 @@ out:
 		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			(die_temp_lower - HYSTERESIS_VALUE), die_temp_upper);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			NORMAL_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
@@ -227,6 +254,8 @@ out:
 			hotspot_temp_to_sensor_temp(OMAP_CPU_THRESHOLD_FATAL);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			NORMAL_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
@@ -276,6 +305,8 @@ out:
 		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			FAST_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
@@ -322,6 +353,8 @@ out:
 		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
+		omap_update_report_rate(omap_gov->temp_sensor,
+			FAST_TEMP_MONITORING_RATE);
 	}
 
 	return 0;
