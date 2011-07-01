@@ -24,12 +24,6 @@
 #include <linux/io.h>
 #include <mach/io.h>
 
-#include <clockdomain.h>
-
-#ifdef __ASM_ARM_ARCH_OMAP_CLOCKDOMAIN_H
-#define clkdm_wakeup omap2_clkdm_wakeup
-#define clkdm_allow_idle omap2_clkdm_allow_idle
-#endif
 
 /*-------------------------------------------------------------------------- */
 

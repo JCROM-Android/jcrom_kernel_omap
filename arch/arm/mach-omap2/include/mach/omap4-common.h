@@ -83,8 +83,18 @@ extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
 extern void omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
 extern void omap4_cpu_resume(void);
 extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+extern u32 schedule_secure_world(u32 app_id, u32 proc_id, u32 flags, u32 args);
 extern u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+
+u32 rpc_handler(u32 p1, u32 p2, u32 p3, u32 p4);
+void omap4_l4sec_clkdm_wakeup(void);
+void omap4_l4sec_clkdm_allow_idle(void);
+extern u32 g_RPC_advancement;
+extern u32 g_RPC_parameters[4];
+extern u32 g_secure_task_id;
+extern u32 g_service_end;
+
 #else
 static inline int omap4_enter_lowpower(unsigned int cpu,
 					unsigned int power_state)

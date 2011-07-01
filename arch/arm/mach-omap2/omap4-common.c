@@ -36,6 +36,13 @@ static void __iomem *gic_dist_base_addr;
 static void __iomem *gic_cpu_base;
 static void __iomem *sar_ram_base;
 static struct clockdomain *l4_secure_clkdm;
+static atomic_t l4_secure_clkdm_use_count = ATOMIC_INIT(0);
+static spinlock_t l4_secure_clkdm_lock;
+
+u32 g_RPC_advancement;
+u32 g_RPC_parameters[4] = {0, 0, 0, 0};
+u32 g_secure_task_id;
+u32 g_service_end;
 
 void __iomem *omap4_get_gic_dist_base(void)
 {
@@ -228,11 +235,26 @@ static int __init omap4_sar_ram_init(void)
 		return -ENODEV;
 
 	l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
-
+	spin_lock_init(&l4_secure_clkdm_lock);
 	return 0;
 }
 early_initcall(omap4_sar_ram_init);
 
+void omap4_l4sec_clkdm_wakeup(void)
+{
+	spin_lock(&l4_secure_clkdm_lock);
+	atomic_inc(&l4_secure_clkdm_use_count);
+	clkdm_wakeup(l4_secure_clkdm);
+	spin_unlock(&l4_secure_clkdm_lock);
+}
+
+void omap4_l4sec_clkdm_allow_idle(void)
+{
+	spin_lock(&l4_secure_clkdm_lock);
+	if (atomic_dec_return(&l4_secure_clkdm_use_count) == 0)
+		clkdm_allow_idle(l4_secure_clkdm);
+	spin_unlock(&l4_secure_clkdm_lock);
+}
 
 /*
  * omap4_sec_dispatcher: Routine to dispatch low power secure
@@ -249,6 +271,7 @@ u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
 							 u32 arg3, u32 arg4)
 {
 	u32 ret;
+	unsigned long iflags;
 	u32 param[5];
 
 	param[0] = nargs;
@@ -257,26 +280,23 @@ u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
 	param[3] = arg3;
 	param[4] = arg4;
 
-	/*
-	 * Put l4 secure to software wakeup  so that secure
-	 * modules are accessible
-	 */
-	clkdm_wakeup(l4_secure_clkdm);
+	/* Make sure parameters are visible to the secure world */
+	dmac_flush_range((void *)param,
+		(void *)(((u32)(param)) + 5*sizeof(u32)));
+	outer_clean_range(__pa(param),
+		__pa(param) + 5*sizeof(u32));
+	wmb();
 
 	/*
-	 * Secure API needs physical address
-	 * pointer for the parameters
+	 * Put L4 Secure clock domain to SW_WKUP so that modules are accessible
 	 */
-	flush_cache_all();
-	outer_clean_range(__pa(param), __pa(param + 5));
+	omap4_l4sec_clkdm_wakeup();
+	local_irq_save(iflags);
+	/* proc_id is always 0 */
+	ret = schedule_secure_world(idx, 0, flag, __pa(param));
+	local_irq_restore(iflags);
 
-	ret = omap_smc2(idx, flag, __pa(param));
-
-	/*
-	 * Restore l4 secure to hardware superwised to allow
-	 * secure modules idle
-	 */
-	clkdm_allow_idle(l4_secure_clkdm);
-
+	/* Restore the HW_SUP on L4 Sec clock domain so hardware can idle */
+	omap4_l4sec_clkdm_allow_idle();
 	return ret;
 }
