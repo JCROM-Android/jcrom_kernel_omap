@@ -23,6 +23,7 @@
 
 #include <mach/omap4-common.h>
 #include <plat/common.h>
+#include <plat/temperature_sensor.h>
 
 #include "powerdomain.h"
 #include "clockdomain.h"
@@ -90,6 +91,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 
 	if (core_next_state < PWRDM_POWER_ON) {
+		omap_temp_sensor_prepare_idle();
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
 		omap_uart_prepare_idle(2);
@@ -101,6 +103,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	omap4_enter_lowpower(cpu, power_state);
 
 	if (core_next_state < PWRDM_POWER_ON) {
+		omap_temp_sensor_resume_idle();
 		omap2_gpio_resume_after_idle();
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
