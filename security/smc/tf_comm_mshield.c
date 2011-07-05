@@ -39,7 +39,7 @@
 #include "tf_conn.h"
 #include "tf_zebra.h"
 #include "tf_crypto.h"
-
+#include "mach/omap4-common.h"
 /*--------------------------------------------------------------------------
  * Internal constants
  *-------------------------------------------------------------------------- */
@@ -65,11 +65,6 @@
 #define RPC_ADVANCEMENT_NONE		0
 #define RPC_ADVANCEMENT_PENDING		1
 #define RPC_ADVANCEMENT_FINISHED	2
-
-u32 g_RPC_advancement;
-u32 g_RPC_parameters[4] = {0, 0, 0, 0};
-u32 g_secure_task_id;
-u32 g_service_end;
 
 /*
  * Secure ROMCode HAL API Identifiers
@@ -128,81 +123,18 @@ static struct wake_lock g_tf_wake_lock;
 static atomic_t tf_wake_lock_count = ATOMIC_INIT(0);
 #endif
 
-static struct clockdomain *smc_l4_sec_clkdm;
-static atomic_t smc_l4_sec_clkdm_use_count = ATOMIC_INIT(0);
-
 static int __init tf_early_init(void)
 {
-	g_secure_task_id = 0;
 
 	dprintk(KERN_INFO "SMC early init\n");
 
-	smc_l4_sec_clkdm = clkdm_lookup("l4_secure_clkdm");
-	if (smc_l4_sec_clkdm == NULL)
-		return -EFAULT;
-
 #ifdef CONFIG_HAS_WAKELOCK
-	wake_lock_init(&g_tf_wake_lock, WAKE_LOCK_SUSPEND,
-		TF_DEVICE_BASE_NAME);
+	wake_lock_init(&g_tf_wake_lock, WAKE_LOCK_SUSPEND, TF_DEVICE_BASE_NAME);
 #endif
 
 	return 0;
 }
 early_initcall(tf_early_init);
-
-/*
- * Function responsible for formatting parameters to pass from NS world to
- * S world
- */
-u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
-	u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-{
-	u32 ret;
-	unsigned long iflags;
-	u32 pub2sec_args[5] = {0, 0, 0, 0, 0};
-
-	/*dprintk(KERN_INFO "omap4_secure_dispatcher: "
-		"app_id=0x%08x, flags=0x%08x, nargs=%u\n",
-		app_id, flags, nargs);*/
-
-	/*if (nargs != 0)
-		dprintk(KERN_INFO
-		"omap4_secure_dispatcher: args=%08x, %08x, %08x, %08x\n",
-		arg1, arg2, arg3, arg4);*/
-
-	pub2sec_args[0] = nargs;
-	pub2sec_args[1] = arg1;
-	pub2sec_args[2] = arg2;
-	pub2sec_args[3] = arg3;
-	pub2sec_args[4] = arg4;
-
-	/* Make sure parameters are visible to the secure world */
-	dmac_flush_range((void *)pub2sec_args,
-		(void *)(((u32)(pub2sec_args)) + 5*sizeof(u32)));
-	outer_clean_range(__pa(pub2sec_args),
-		__pa(pub2sec_args) + 5*sizeof(u32));
-	wmb();
-
-	/*
-	 * Put L4 Secure clock domain to SW_WKUP so that modules are accessible
-	 */
-	tf_l4sec_clkdm_wakeup(false);
-
-	local_irq_save(iflags);
-#ifdef DEBUG
-	BUG_ON((read_mpidr() & 0x00000003) != 0);
-#endif
-	/* proc_id is always 0 */
-	ret = schedule_secure_world(app_id, 0, flags, __pa(pub2sec_args));
-	local_irq_restore(iflags);
-
-	/* Restore the HW_SUP on L4 Sec clock domain so hardware can idle */
-	tf_l4sec_clkdm_allow_idle(false);
-
-	/*dprintk(KERN_INFO "omap4_secure_dispatcher()\n");*/
-
-	return ret;
-}
 
 /* Yields the Secure World */
 int tf_schedule_secure_world(struct tf_comm *comm, bool prepare_exit)
@@ -419,8 +351,8 @@ int tf_rpc_execute(struct tf_comm *comm)
 	u32 rpc_command;
 	u32 rpc_error = RPC_NO;
 
-#ifdef DEBUG
-	BUG_ON((read_mpidr() & 0x00000003) != 0);
+#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
+	BUG_ON((hard_smp_processor_id() & 0x00000003) != 0);
 #endif
 
 	/* Lock the RPC */
@@ -467,35 +399,33 @@ int tf_rpc_execute(struct tf_comm *comm)
 	return rpc_error;
 }
 
-/*--------------------------------------------------------------------------
- * L4 SEC Clock domain handling
- *-------------------------------------------------------------------------- */
 
 void tf_l4sec_clkdm_wakeup(bool wakelock)
 {
-	spin_lock(&tf_get_device()->sm.lock);
 #ifdef CONFIG_HAS_WAKELOCK
 	if (wakelock) {
-		atomic_inc(&tf_wake_lock_count);
-		wake_lock(&g_tf_wake_lock);
+	spin_lock(&tf_get_device()->sm.lock);
+	atomic_inc(&tf_wake_lock_count);
+	wake_lock(&g_tf_wake_lock);
+	spin_unlock(&tf_get_device()->sm.lock);
 	}
 #endif
-	atomic_inc(&smc_l4_sec_clkdm_use_count);
-	clkdm_wakeup(smc_l4_sec_clkdm);
-	spin_unlock(&tf_get_device()->sm.lock);
+	omap4_l4sec_clkdm_wakeup();
+
 }
 
 void tf_l4sec_clkdm_allow_idle(bool wakeunlock)
 {
-	spin_lock(&tf_get_device()->sm.lock);
-	if (atomic_dec_return(&smc_l4_sec_clkdm_use_count) == 0)
-		clkdm_allow_idle(smc_l4_sec_clkdm);
+	omap4_l4sec_clkdm_allow_idle();
+
 #ifdef CONFIG_HAS_WAKELOCK
-	if (wakeunlock)
+	if (wakeunlock) {
+		spin_lock(&tf_get_device()->sm.lock);
 		if (atomic_dec_return(&tf_wake_lock_count) == 0)
 			wake_unlock(&g_tf_wake_lock);
+		spin_unlock(&tf_get_device()->sm.lock);
+	}
 #endif
-	spin_unlock(&tf_get_device()->sm.lock);
 }
 
 /*--------------------------------------------------------------------------
