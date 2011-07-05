@@ -29,10 +29,6 @@ int tf_start(struct tf_comm *comm,
 	u8 *pa_buffer, u32 pa_size,
 	u8 *properties_buffer, u32 properties_length);
 
-/* Assembler entry points to/from secure */
-u32 schedule_secure_world(u32 app_id, u32 proc_id, u32 flags, u32 args);
-u32 rpc_handler(u32 p1, u32 p2, u32 p3, u32 p4);
-u32 read_mpidr(void);
 
 /* L4 SEC clockdomain enabling/disabling */
 void tf_l4sec_clkdm_wakeup(bool wakelock);

@@ -37,9 +37,3 @@ config TF_DRIVER_DEBUG_SUPPORT
 	help
 	  This options enables debug traces in the driver.
 
-config SMC_BENCH_SECURE_CYCLE
-	bool "Enable secure cycles benchmarks"
-	depends on TF_DRIVER_DEBUG_SUPPORT && ARCH_OMAP4
-	default n
-	help
-	  This options enables benchmarks.
