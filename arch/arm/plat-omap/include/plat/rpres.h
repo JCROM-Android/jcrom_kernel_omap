@@ -14,6 +14,8 @@
 #ifndef _PLAT_OMAP_RPRES_H
 #define _PLAT_OMAP_RPRES_H
 
+#define RPRES_DEVICE_IS_CREATED	0x1
+
 enum rpres_constraint {
 	RPRES_CONSTRAINT_SCALE,
 	RPRES_CONSTRAINT_LATENCY,
@@ -40,6 +42,8 @@ struct rpres_platform_data {
 	struct rpres_ops *ops;
 	struct clk *opt_clk;
 	const char *opt_clk_name;
+	u32 flags;
+	struct device *(*get_dev)(void);
 };
 
 struct rpres {
