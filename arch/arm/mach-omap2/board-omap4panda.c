@@ -52,6 +52,7 @@
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/omap_apps_brd_id.h>
 #include <plat/remoteproc.h>
 #include <plat/vram.h>
 #include <video/omap-panel-generic-dpi.h>
@@ -860,6 +861,9 @@ static void __init omap4_panda_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, NULL, package);
+
+	omap_init_board_version(OMAP4_PANDA_ID);
+	omap4_create_board_props();
 
 	if (wl12xx_set_platform_data(&omap_panda_wlan_data))
 		pr_err("error setting wl12xx data\n");
