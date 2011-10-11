@@ -45,6 +45,8 @@
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
 
+#include "board-blaze.h"
+#include "omap4_ion.h"
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
