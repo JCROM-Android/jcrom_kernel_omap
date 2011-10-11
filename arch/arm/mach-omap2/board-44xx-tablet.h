@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010 Google, Inc.
+ * arch/arm/mach-omap2/board-44xx-tablet.h
+ *
+ * Copyright (C) 2011 Texas Instruments
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -12,16 +14,13 @@
  *
  */
 
-#ifndef _INCLUDE_LINUX_PLATFORM_DATA_RAM_CONSOLE_H_
-#define _INCLUDE_LINUX_PLATFORM_DATA_RAM_CONSOLE_H_
+#ifndef _MACH_OMAP_BOARD_44XX_TABLET2_H
+#define _MACH_OMAP_BOARD_44XX_TABLET2_H
 
-struct ram_console_platform_data {
-	const char *bootinfo;
-};
-int blaze_touch_init(void);
-int blaze_sensor_init(void);
-int blaze_panel_init(void);
-int blaze_keypad_init(void);
+int tablet_touch_init(void);
+int tablet_sensor_init(void);
 void omap4_create_board_props(void);
+int tablet_panel_init(void);
+int tablet_button_init(void);
 
-#endif /* _INCLUDE_LINUX_PLATFORM_DATA_RAM_CONSOLE_H_ */
+#endif

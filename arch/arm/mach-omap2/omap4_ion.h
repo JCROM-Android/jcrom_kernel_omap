@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010 Google, Inc.
+ * arch/arm/mach-omap2/board-blaze.h
+ *
+ * Copyright (C) 2011 Texas Instruments
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -12,16 +14,15 @@
  *
  */
 
-#ifndef _INCLUDE_LINUX_PLATFORM_DATA_RAM_CONSOLE_H_
-#define _INCLUDE_LINUX_PLATFORM_DATA_RAM_CONSOLE_H_
+#ifndef _OMAP4_ION_H
+#define _OMAP4_ION_H
 
-struct ram_console_platform_data {
-	const char *bootinfo;
-};
-int blaze_touch_init(void);
-int blaze_sensor_init(void);
-int blaze_panel_init(void);
-int blaze_keypad_init(void);
-void omap4_create_board_props(void);
+#ifdef CONFIG_ION_OMAP
+void omap_ion_init(void);
+void omap4_register_ion(void);
+#else
+inline void omap_ion_init(void) { return; }
+inline void omap4_register_ion(void) { return; }
+#endif
 
-#endif /* _INCLUDE_LINUX_PLATFORM_DATA_RAM_CONSOLE_H_ */
+#endif
