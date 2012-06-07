@@ -91,15 +91,6 @@
 				OMAP_ION_HEAP_SECURE_INPUT_SIZE)
 
 #define WILINK_UART_DEV_NAME	"/dev/ttyO1"
-/* wl127x BT, FM, GPS connectivity chip */
-static int wl1271_gpios[] = {46, -1, -1};
-static struct platform_device wl1271_device = {
-	.name	= "kim",
-	.id	= -1,
-	.dev	= {
-		.platform_data	= &wl1271_gpios,
-	},
-};
 
 static struct gpio_led gpio_leds[] = {
 	{
