@@ -1207,7 +1207,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 		}
 	}
 	else
-#else
+#endif
 	{
 		psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
 		psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
@@ -1219,7 +1219,6 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 		psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
 		psPVRFBInfo->psPageList = IMG_NULL;
 	}
-#endif
 	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
 	
 	psPVRFBInfo->ulRoundedBufferSize = RoundUpToMultiple(psPVRFBInfo->ulBufferSize, ulLCM);
