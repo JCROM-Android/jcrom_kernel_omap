@@ -74,6 +74,9 @@ return_from_irq:
 	b	label_smc
 
 label_smc:
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+        .arch_extension sec
+#endif
 	INVALIDATE_BTB
 	dsb
 	dmb
