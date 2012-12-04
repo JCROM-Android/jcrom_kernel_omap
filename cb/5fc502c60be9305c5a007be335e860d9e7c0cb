@@ -1,0 +1,8 @@
+Change-Id: Icb5fc502c60be9305c5a007be335e860d9e7c0cb
+Code-Review+2: Jean-Baptiste Queru <jbq@google.com>
+Verified+1: Jean-Baptiste Queru <jbq@google.com>
+Submitted-by: Jean-Baptiste Queru <jbq@google.com>
+Submitted-at: Mon, 03 Dec 2012 18:56:41 -0800
+Reviewed-on: https://android-review.googlesource.com/47410
+Project: kernel/omap
+Branch: refs/heads/android-omap-panda-3.0
