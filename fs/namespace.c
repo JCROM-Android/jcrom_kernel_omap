@@ -417,6 +417,12 @@ void mnt_drop_write(struct vfsmount *mnt)
 }
 EXPORT_SYMBOL_GPL(mnt_drop_write);
 
+void mnt_drop_write_file(struct file *file)
+{
+	mnt_drop_write(file->f_path.mnt);
+}
+EXPORT_SYMBOL(mnt_drop_write_file);
+
 static int mnt_make_readonly(struct vfsmount *mnt)
 {
 	int ret = 0;
@@ -2031,6 +2037,13 @@ static int do_new_mount(struct path *path, char *type, int flags,
 	err = do_add_mount(mnt, path, mnt_flags);
 	if (err)
 		mntput(mnt);
+#ifdef CONFIG_ASYNC_FSYNC
+  if (!err && ((!strcmp(type, "ext4") &&
+      !strcmp(path->dentry->d_name.name, "data")) ||
+      (!strcmp(type, "fuse") &&
+      !strcmp(path->dentry->d_name.name, "emulated"))))
+                mnt->mnt_sb->fsync_flags |= FLAG_ASYNC_FSYNC;
+#endif
 	return err;
 }
 
